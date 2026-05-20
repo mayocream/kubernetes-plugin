@@ -34,6 +34,7 @@ public class ContainerStepExecution extends StepExecution {
     private final transient ContainerStep step;
 
     private ContainerExecDecorator decorator;
+    private ContainerListenDecorator listenDecorator;
 
     ContainerStepExecution(ContainerStep step, StepContext context) {
         super(context);
@@ -70,18 +71,26 @@ public class ContainerStepExecution extends StepExecution {
             rcEnvVars = run.getEnvironment(taskListener);
         }
 
-        decorator = new ContainerExecDecorator();
-        decorator.setNodeContext(nodeContext);
-        decorator.setContainerName(containerName);
-        decorator.setEnvironmentExpander(env);
-        decorator.setGlobalVars(globalVars);
-        decorator.setRunContextEnvVars(rcEnvVars);
-        decorator.setShell(shell);
+        if (ContainerListenDecorator.ENABLED) {
+            listenDecorator = new ContainerListenDecorator(containerName);
+            // TODO handle env, globalVars, rcEnvVars, shell
+        } else {
+            decorator = new ContainerExecDecorator();
+            decorator.setNodeContext(nodeContext);
+            decorator.setContainerName(containerName);
+            decorator.setEnvironmentExpander(env);
+            decorator.setGlobalVars(globalVars);
+            decorator.setRunContextEnvVars(rcEnvVars);
+            decorator.setShell(shell);
+        }
         getContext()
                 .newBodyInvoker()
                 .withContexts(
-                        BodyInvoker.mergeLauncherDecorators(getContext().get(LauncherDecorator.class), decorator), env)
-                .withCallback(closeQuietlyCallback(decorator))
+                        BodyInvoker.mergeLauncherDecorators(
+                                getContext().get(LauncherDecorator.class),
+                                listenDecorator != null ? listenDecorator : decorator),
+                        env)
+                .withCallback(closeQuietlyCallback(listenDecorator != null ? listenDecorator : decorator))
                 .start();
         return false;
     }
@@ -89,7 +98,7 @@ public class ContainerStepExecution extends StepExecution {
     @Override
     public void stop(@NonNull Throwable cause) throws Exception {
         LOGGER.log(Level.FINE, "Stopping container step.");
-        closeQuietly(getContext(), decorator);
+        closeQuietly(getContext(), listenDecorator != null ? listenDecorator : decorator);
     }
 
     /**
