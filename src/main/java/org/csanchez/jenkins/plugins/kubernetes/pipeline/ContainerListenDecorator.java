@@ -151,7 +151,8 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
             if (ENABLED) {
                 // TODO exclude Windows
                 for (var c : pod.getSpec().getContainers()) {
-                    if (c.getCommand().size() == 1 && c.getCommand().get(0).matches("((/usr)?/bin/)?(sleep|cat)")) {
+                    var cmds = c.getCommand();
+                    if (cmds != null && cmds.size() == 1 && cmds.get(0).matches("((/usr)?/bin/)?(sleep|cat)")) {
                         c.setCommand(List.of("sh"));
                         var name = c.getName();
                         var loc = loc(name);
