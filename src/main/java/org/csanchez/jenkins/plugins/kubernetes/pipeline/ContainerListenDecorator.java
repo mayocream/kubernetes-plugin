@@ -31,16 +31,15 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Serial;
 import java.io.Serializable;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
+import java.util.random.RandomGenerator;
 import jenkins.util.SystemProperties;
 import org.csanchez.jenkins.plugins.kubernetes.ContainerTemplate;
 import org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud;
 import org.csanchez.jenkins.plugins.kubernetes.KubernetesSlave;
 import org.csanchez.jenkins.plugins.kubernetes.pod.decorator.PodDecorator;
-import org.csanchez.jenkins.plugins.kubernetes.pod.decorator.PodDecoratorException;
 
 /**
  * Alternative to {@link ContainerExecDecorator} which does not rely on the API server.
@@ -73,8 +72,21 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                 if (!launcher.isUnix()) {
                     throw new AbortException("TODO Windows not yet supported");
                 }
-                var f = new FilePath(launcher.getChannel(), loc(container));
+                FilePath f;
                 try {
+                    var work = new FilePath(launcher.getChannel(), work());
+                    var bootstrap = work.child("bootstrap.sh");
+                    if (!bootstrap.exists()) {
+                        work.mkdirs();
+                        bootstrap.copyFrom(
+                                ContainerListenDecorator.class.getResource("scripts/container-bootstrap.sh"));
+                        LOGGER.info("TODO created " + bootstrap);
+                    }
+                    var procDir = work.child(container)
+                            .child("%016x"
+                                    .formatted(RandomGenerator.getDefault().nextLong()));
+                    procDir.mkdirs();
+                    f = procDir.child("script.sh");
                     var sb = new StringBuilder();
                     var pwd = starter.pwd();
                     if (pwd != null) {
@@ -153,10 +165,9 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
         sb.append("'");
     }
 
-    // TODO look up actual workspace location
-    // TODO create separate file per launch, so processes could run in parallel
-    private static String loc(String containerName) {
-        return ContainerTemplate.DEFAULT_WORKING_DIR + "/listen-" + containerName + ".sh";
+    // TODO look up actual mountPath of workspace-volume mount
+    private static String work() {
+        return ContainerTemplate.DEFAULT_WORKING_DIR + "/container-work";
     }
 
     @Extension
@@ -169,21 +180,16 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                 for (var c : pod.getSpec().getContainers()) {
                     var cmds = c.getCommand();
                     if (cmds != null && cmds.size() == 1 && cmds.get(0).matches("((/usr)?/bin/)?(sleep|cat)")) {
-                        c.setCommand(List.of("sh"));
                         var name = c.getName();
+                        c.setCommand(List.of("sh"));
+                        c.setArgs(
+                                List.of(
+                                        "-c",
+                                        "until test -f \"$JENKINS_CONTAINER_WORK\"/bootstrap.sh; do sleep 1; done; . \"$JENKINS_CONTAINER_WORK\"/bootstrap.sh"));
                         var env = new ArrayList<>(c.getEnv());
-                        env.add(new EnvVar("LOC", loc(name), null));
+                        env.add(new EnvVar("JENKINS_CONTAINER_WORK", work(), null));
+                        env.add(new EnvVar("JENKINS_CONTAINER_NAME", name, null));
                         c.setEnv(env);
-                        // TODO rather write the real script to disk, and here just have a placeholder
-                        String script;
-                        // must pass shellcheck -s sh
-                        try (var is =
-                                ContainerListenDecorator.class.getResourceAsStream("scripts/container-listen.sh")) {
-                            script = new String(is.readAllBytes(), StandardCharsets.US_ASCII);
-                        } catch (IOException x) {
-                            throw new PodDecoratorException(null, x);
-                        }
-                        c.setArgs(List.of("-c", script));
                         LOGGER.info(() -> "adjusted container " + name + " in "
                                 + pod.getMetadata().getName());
                     } else {
