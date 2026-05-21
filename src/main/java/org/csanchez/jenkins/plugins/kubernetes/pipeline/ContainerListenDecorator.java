@@ -17,13 +17,11 @@
 package org.csanchez.jenkins.plugins.kubernetes.pipeline;
 
 import hudson.AbortException;
-import hudson.EnvVars;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
 import hudson.LauncherDecorator;
 import hudson.Proc;
-import hudson.model.Computer;
 import hudson.model.Node;
 import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.Pod;
@@ -37,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 import java.util.random.RandomGenerator;
+import java.util.stream.Stream;
 import jenkins.util.SystemProperties;
 import org.csanchez.jenkins.plugins.kubernetes.ContainerTemplate;
 import org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud;
@@ -96,28 +95,19 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                         quote(sb, pwd.getRemote());
                         sb.append("; ");
                     }
-                    // Filter environment variables to only keep those that differ from Computer's environment.
-                    // This prevents the JNLP agent container's environment from polluting the target container.
-                    String[] envVars = starter.envs();
+                    var envVars = starter.envs();
                     if (node != null) {
-                        Computer computer = node.toComputer();
-                        if (computer != null) {
-                            try {
-                                EnvVars environment = computer.getEnvironment();
-                                if (environment != null) {
-                                    List<String> filteredEnvVars = new ArrayList<>();
-                                    for (String keyValue : envVars) {
-                                        String[] split = keyValue.split("=", 2);
-                                        if (split.length == 2 && !split[1].equals(environment.get(split[0]))) {
-                                            // Only keep environment variables that differ from Computer's environment
-                                            filteredEnvVars.add(keyValue);
-                                        }
-                                    }
-                                    envVars = filteredEnvVars.toArray(new String[0]);
-                                }
-                            } catch (InterruptedException x) {
-                                throw new IOException(x);
-                            }
+                        var c = node.toComputer();
+                        if (c != null) {
+                            // Remove env vars which are simply inherited from the agent container’s environment.
+                            // Some of these like $JAVA_HOME could be unnecessary or even harmful in other containers.
+                            var agentEnv = c.getEnvironment();
+                            envVars = Stream.of(envVars)
+                                    .filter(kv -> {
+                                        var split = kv.split("=", 2);
+                                        return split.length == 2 && !split[1].equals(agentEnv.get(split[0]));
+                                    })
+                                    .toArray(String[]::new);
                         }
                     }
                     for (var env : envVars) {
