@@ -17,6 +17,7 @@
 package org.csanchez.jenkins.plugins.kubernetes.pipeline;
 
 import hudson.AbortException;
+import hudson.CloseProofOutputStream;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
@@ -73,7 +74,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                 if (!launcher.isUnix()) {
                     throw new AbortException("TODO Windows not yet supported");
                 }
-                FilePath f;
+                FilePath procDir;
                 try {
                     var work = new FilePath(launcher.getChannel(), work());
                     var bootstrap = work.child("bootstrap.sh");
@@ -83,11 +84,11 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                                 ContainerListenDecorator.class.getResource("scripts/container-bootstrap.sh"));
                         LOGGER.info("TODO created " + bootstrap);
                     }
-                    var procDir = work.child(container)
+                    procDir = work.child(container)
                             .child("%016x"
                                     .formatted(RandomGenerator.getDefault().nextLong()));
                     procDir.mkdirs();
-                    f = procDir.child("script.sh");
+                    var f = procDir.child("script.sh");
                     var sb = new StringBuilder();
                     var pwd = starter.pwd();
                     if (pwd != null) {
@@ -115,7 +116,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                         quote(sb, env);
                         sb.append("\n");
                     }
-                    // TODO masks, stdout, …
+                    // TODO quiet & masks
                     for (var cmd : starter.cmds()) {
                         cmd = cmd.replace("$$", "$"); // undo BourneShellScript.scriptLauncherCmd
                         quote(sb, cmd);
@@ -129,29 +130,50 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                 return new Proc() {
                     @Override
                     public boolean isAlive() throws IOException, InterruptedException {
-                        return f.exists();
+                        return procDir.child("seen").exists()
+                                && !procDir.child("status.txt").exists();
                     }
 
                     @Override
                     public void kill() throws IOException, InterruptedException {
-                        // TODO
+                        // TODO could touch some death flag
+                        procDir.child("status.txt").write("-1", null);
                     }
 
                     @Override
                     public int join() throws IOException, InterruptedException {
-                        // TODO capture exit code
-                        return 0;
+                        var status = procDir.child("status.txt");
+                        while (!status.exists()) {
+                            Thread.sleep(100);
+                        }
+                        // No streaming supported, just logging/capturing of stdio from a completed process.
+                        // In practice most steps are durable, which produce no stdio themselves;
+                        // or relatively brief and so streaming is unnecessary.
+                        LOGGER.info("TODO " + procDir + " completed with status "
+                                + status.readToString().trim() + " and stdout "
+                                + procDir.child("out.txt").length() + "b stderr"
+                                + procDir.child("err.txt").length() + "b");
+                        var os = starter.stdout();
+                        if (os == null) {
+                            os = launcher.getListener().getLogger();
+                        }
+                        procDir.child("out.txt").copyTo(new CloseProofOutputStream(os));
+                        os = starter.stderr();
+                        if (os == null) {
+                            os = launcher.getListener().getLogger();
+                        }
+                        procDir.child("err.txt").copyTo(new CloseProofOutputStream(os));
+                        return Integer.parseInt(status.readToString().trim());
                     }
 
                     @Override
                     public InputStream getStdout() {
-                        // TODO
-                        return InputStream.nullInputStream();
+                        return null;
                     }
 
                     @Override
                     public InputStream getStderr() {
-                        return InputStream.nullInputStream();
+                        return null;
                     }
 
                     @Override
