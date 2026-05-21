@@ -73,22 +73,23 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                 }
                 var f = new FilePath(launcher.getChannel(), loc(container));
                 try {
-                    // TODO envs, masks, stdout, …
-                    // TODO better quote pwd
-                    var sb = new StringBuffer("cd '").append(starter.pwd()).append("';");
+                    var sb = new StringBuilder();
+                    var pwd = starter.pwd();
+                    if (pwd != null) {
+                        sb.append("cd ");
+                        quote(sb, pwd.getRemote());
+                        sb.append("; ");
+                    }
+                    for (var env : starter.envs()) {
+                        sb.append("export ");
+                        quote(sb, env);
+                        sb.append("; ");
+                    }
+                    // TODO masks, stdout, …
                     for (var cmd : starter.cmds()) {
                         cmd = cmd.replace("$$", "$"); // undo BourneShellScript.scriptLauncherCmd
-                        LOGGER.info("TODO " + cmd);
-                        sb.append(" '");
-                        for (int i = 0; i < cmd.length(); i++) {
-                            char c = cmd.charAt(i);
-                            if (c == '\'') {
-                                sb.append("'\"'\"'");
-                            } else {
-                                sb.append(c);
-                            }
-                        }
-                        sb.append("'");
+                        quote(sb, cmd);
+                        sb.append(" ");
                     }
                     f.write(sb.toString(), null);
                     LOGGER.info("TODO wrote to " + f + ": \n" + sb);
@@ -137,6 +138,19 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
         // anything to do?
     }
 
+    private static void quote(StringBuilder sb, String s) {
+        sb.append("'");
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\'') {
+                sb.append("'\"'\"'"); // or '\''
+            } else {
+                sb.append(c);
+            }
+        }
+        sb.append("'");
+    }
+
     // TODO look up actual workspace location
     // TODO create separate file per launch, so processes could run in parallel
     private static String loc(String containerName) {
@@ -156,6 +170,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                         c.setCommand(List.of("sh"));
                         var name = c.getName();
                         var loc = loc(name);
+                        // TODO rather write the real script to disk, and here just have a placeholder
                         String script;
                         try (var is =
                                 ContainerListenDecorator.class.getResourceAsStream("scripts/container-listen.sh")) {
@@ -168,7 +183,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                         LOGGER.info(() -> "adjusted container " + name + " in "
                                 + pod.getMetadata().getName());
                     } else {
-                        LOGGER.info("TODO " + c + " does not match");
+                        LOGGER.fine(() -> c + " does not match");
                     }
                 }
             }
