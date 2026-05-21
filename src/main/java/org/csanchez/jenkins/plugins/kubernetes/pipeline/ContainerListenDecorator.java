@@ -30,6 +30,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Serial;
 import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.logging.Logger;
 import jenkins.util.SystemProperties;
@@ -155,10 +156,9 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                         var name = c.getName();
                         var loc = loc(name);
                         String script;
-                        try {
-                            script = new String(ContainerListenDecorator.class
-                                    .getResourceAsStream("scripts/container-listen.sh")
-                                    .readAllBytes());
+                        try (var is =
+                                ContainerListenDecorator.class.getResourceAsStream("scripts/container-listen.sh")) {
+                            script = new String(is.readAllBytes(), StandardCharsets.US_ASCII);
                         } catch (IOException x) {
                             throw new PodDecoratorException(null, x);
                         }
