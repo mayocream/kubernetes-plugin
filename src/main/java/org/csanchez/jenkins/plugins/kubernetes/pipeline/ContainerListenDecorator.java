@@ -171,15 +171,17 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                         var name = c.getName();
                         var loc = loc(name);
                         // TODO rather write the real script to disk, and here just have a placeholder
-                        String script;
+                        // TODO set container env var instead of prepending to script
+                        var sb = new StringBuilder("LOC=");
+                        quote(sb, loc);
+                        sb.append("\n");
                         try (var is =
                                 ContainerListenDecorator.class.getResourceAsStream("scripts/container-listen.sh")) {
-                            script = new String(is.readAllBytes(), StandardCharsets.US_ASCII);
+                            sb.append(new String(is.readAllBytes(), StandardCharsets.US_ASCII));
                         } catch (IOException x) {
                             throw new PodDecoratorException(null, x);
                         }
-                        // TODO set container env var instead of prepending to script
-                        c.setArgs(List.of("-c", "LOC='" + loc + "'\n" + script));
+                        c.setArgs(List.of("-c", sb.toString()));
                         LOGGER.info(() -> "adjusted container " + name + " in "
                                 + pod.getMetadata().getName());
                     } else {
