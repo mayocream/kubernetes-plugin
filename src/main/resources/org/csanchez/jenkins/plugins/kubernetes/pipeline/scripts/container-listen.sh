@@ -1,7 +1,7 @@
 set -x
 while true
 do
-  until [ -f "$LOC" ]
+  until test -f "$LOC"
   do
     sleep 1
   done
