@@ -23,6 +23,7 @@ import hudson.Launcher;
 import hudson.LauncherDecorator;
 import hudson.Proc;
 import hudson.model.Node;
+import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.Pod;
 import java.io.Closeable;
 import java.io.IOException;
@@ -31,6 +32,7 @@ import java.io.OutputStream;
 import java.io.Serial;
 import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 import jenkins.util.SystemProperties;
@@ -169,19 +171,19 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                     if (cmds != null && cmds.size() == 1 && cmds.get(0).matches("((/usr)?/bin/)?(sleep|cat)")) {
                         c.setCommand(List.of("sh"));
                         var name = c.getName();
-                        var loc = loc(name);
+                        var env = new ArrayList<>(c.getEnv());
+                        env.add(new EnvVar("LOC", loc(name), null));
+                        c.setEnv(env);
                         // TODO rather write the real script to disk, and here just have a placeholder
-                        // TODO set container env var instead of prepending to script
-                        var sb = new StringBuilder("LOC=");
-                        quote(sb, loc);
-                        sb.append("\n");
+                        String script;
+                        // must pass shellcheck -s sh
                         try (var is =
                                 ContainerListenDecorator.class.getResourceAsStream("scripts/container-listen.sh")) {
-                            sb.append(new String(is.readAllBytes(), StandardCharsets.US_ASCII));
+                            script = new String(is.readAllBytes(), StandardCharsets.US_ASCII);
                         } catch (IOException x) {
                             throw new PodDecoratorException(null, x);
                         }
-                        c.setArgs(List.of("-c", sb.toString()));
+                        c.setArgs(List.of("-c", script));
                         LOGGER.info(() -> "adjusted container " + name + " in "
                                 + pod.getMetadata().getName());
                     } else {
