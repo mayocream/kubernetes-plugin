@@ -17,11 +17,13 @@
 package org.csanchez.jenkins.plugins.kubernetes.pipeline;
 
 import hudson.AbortException;
+import hudson.EnvVars;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
 import hudson.LauncherDecorator;
 import hudson.Proc;
+import hudson.model.Computer;
 import hudson.model.Node;
 import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.Pod;
@@ -94,7 +96,31 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                         quote(sb, pwd.getRemote());
                         sb.append("; ");
                     }
-                    for (var env : starter.envs()) {
+                    // Filter environment variables to only keep those that differ from Computer's environment.
+                    // This prevents the JNLP agent container's environment from polluting the target container.
+                    String[] envVars = starter.envs();
+                    if (node != null) {
+                        Computer computer = node.toComputer();
+                        if (computer != null) {
+                            try {
+                                EnvVars environment = computer.getEnvironment();
+                                if (environment != null) {
+                                    List<String> filteredEnvVars = new ArrayList<>();
+                                    for (String keyValue : envVars) {
+                                        String[] split = keyValue.split("=", 2);
+                                        if (split.length == 2 && !split[1].equals(environment.get(split[0]))) {
+                                            // Only keep environment variables that differ from Computer's environment
+                                            filteredEnvVars.add(keyValue);
+                                        }
+                                    }
+                                    envVars = filteredEnvVars.toArray(new String[0]);
+                                }
+                            } catch (InterruptedException x) {
+                                throw new IOException(x);
+                            }
+                        }
+                    }
+                    for (var env : envVars) {
                         sb.append("export ");
                         quote(sb, env);
                         sb.append("; ");
