@@ -163,7 +163,9 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                             os = launcher.getListener().getLogger();
                         }
                         procDir.child("err.txt").copyTo(new CloseProofOutputStream(os));
-                        return Integer.parseInt(status.readToString().trim());
+                        var r = Integer.parseInt(status.readToString().trim());
+                        procDir.deleteRecursive();
+                        return r;
                     }
 
                     @Override
