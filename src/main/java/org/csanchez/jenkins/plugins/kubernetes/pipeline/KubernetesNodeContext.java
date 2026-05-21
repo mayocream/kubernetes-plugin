@@ -21,6 +21,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import hudson.AbortException;
 import hudson.model.Node;
+import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.dsl.PodResource;
 import java.io.IOException;
@@ -41,6 +42,8 @@ public class KubernetesNodeContext implements Serializable {
 
     @CheckForNull
     private final String namespace;
+
+    private transient Pod pod;
 
     /**
      * Create new Kubernetes context
@@ -83,6 +86,14 @@ public class KubernetesNodeContext implements Serializable {
     @NonNull
     public PodResource getPodResource() throws IOException, InterruptedException, KubernetesAuthException {
         return getKubernetesSlave().getKubernetesCloud().getPodResource(namespace, podName);
+    }
+
+    @CheckForNull
+    public synchronized Pod getPod() throws IOException, InterruptedException, KubernetesAuthException {
+        if (pod == null) {
+            pod = getPodResource().get();
+        }
+        return pod;
     }
 
     KubernetesClient connectToCloud() throws Exception {
