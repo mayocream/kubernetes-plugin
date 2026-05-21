@@ -93,7 +93,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                     if (pwd != null) {
                         sb.append("cd ");
                         quote(sb, pwd.getRemote());
-                        sb.append("; ");
+                        sb.append("\n");
                     }
                     var envVars = starter.envs();
                     if (node != null) {
@@ -113,7 +113,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                     for (var env : envVars) {
                         sb.append("export ");
                         quote(sb, env);
-                        sb.append("; ");
+                        sb.append("\n");
                     }
                     // TODO masks, stdout, …
                     for (var cmd : starter.cmds()) {
