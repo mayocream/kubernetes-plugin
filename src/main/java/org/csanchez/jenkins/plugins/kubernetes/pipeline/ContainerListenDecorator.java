@@ -104,7 +104,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                     () -> "Could not verify eligibility of container " + container + " in " + nodeContext.getPodName());
         }
         LOGGER.info("TODO prepping launcher for " + container);
-        return new LauncherImpl(launcher, launcher, node);
+        return new LauncherImpl(launcher, node);
     }
 
     private static final Launcher undecorate(Launcher launcher) {
@@ -121,19 +121,16 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
     }
 
     private class LauncherImpl extends Launcher.DecoratedLauncher {
-        private final Launcher launcher;
-
         private final Node node;
 
-        public LauncherImpl(Launcher inner, Launcher launcher, Node node) {
-            super(inner);
-            this.launcher = launcher;
+        public LauncherImpl(Launcher base, Node node) {
+            super(base);
             this.node = node;
         }
 
         @Override
         public Proc launch(Launcher.ProcStarter starter) throws IOException {
-            if (!launcher.isUnix()) {
+            if (!isUnix()) {
                 throw new AbortException("TODO Windows not yet supported");
             }
             FilePath procDir;
@@ -143,7 +140,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                         .findFirst()
                         .orElseThrow(() ->
                                 new IOException("Cannot find JENKINS_AGENT_WORKDIR in " + nodeContext.getPodName()));
-                var work = new FilePath(launcher.getChannel(), workspaceToAgent + "/container-work");
+                var work = new FilePath(getChannel(), workspaceToAgent + "/container-work");
                 var bootstrap = work.child("bootstrap.sh");
                 if (!bootstrap.exists()) {
                     work.mkdirs();
@@ -241,12 +238,12 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                             + procDir.child("err.txt").length() + "b");
                     var os = starter.stdout();
                     if (os == null) {
-                        os = launcher.getListener().getLogger();
+                        os = getListener().getLogger();
                     }
                     procDir.child("out.txt").copyTo(new CloseProofOutputStream(os));
                     os = starter.stderr();
                     if (os == null) {
-                        os = launcher.getListener().getLogger();
+                        os = getListener().getLogger();
                     }
                     procDir.child("err.txt").copyTo(new CloseProofOutputStream(os));
                     var r = Integer.parseInt(status.readToString().trim());
