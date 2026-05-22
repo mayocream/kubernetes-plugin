@@ -75,6 +75,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
         if (node != null && !(node instanceof KubernetesSlave)) {
             return launcher;
         }
+        launcher = undecorate(launcher);
         try {
             var pod = nodeContext.getPod();
             if (pod != null) {
@@ -88,7 +89,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                         launcher.getListener()
                                 .getLogger()
                                 .println("Warning: container step on unpatched container " + c.getName());
-                        return undecorate(launcher);
+                        return launcher;
                     }
                 } else {
                     LOGGER.warning(() -> "Could not find container " + container + " in " + nodeContext.getPodName());
