@@ -24,8 +24,10 @@ import hudson.Launcher;
 import hudson.LauncherDecorator;
 import hudson.Proc;
 import hudson.model.Node;
+import io.fabric8.kubernetes.api.model.Container;
 import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.Pod;
+import io.fabric8.kubernetes.api.model.VolumeMount;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,15 +36,17 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.random.RandomGenerator;
 import java.util.stream.Stream;
 import jenkins.util.SystemProperties;
-import org.csanchez.jenkins.plugins.kubernetes.ContainerTemplate;
 import org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud;
 import org.csanchez.jenkins.plugins.kubernetes.KubernetesSlave;
+import org.csanchez.jenkins.plugins.kubernetes.PodTemplateBuilder;
 import org.csanchez.jenkins.plugins.kubernetes.pod.decorator.PodDecorator;
+import org.jenkinsci.plugins.kubernetes.auth.KubernetesAuthException;
 
 /**
  * Alternative to {@link ContainerExecDecorator} which does not rely on the API server.
@@ -133,7 +137,12 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
             }
             FilePath procDir;
             try {
-                var work = new FilePath(launcher.getChannel(), work());
+                var workspaceToAgent = workspaceVolumeMountPath(nodeContext.getPod(), c -> c.getEnv().stream()
+                                .anyMatch(e -> e.getName().equals("JENKINS_AGENT_WORKDIR")))
+                        .findFirst()
+                        .orElseThrow(() ->
+                                new IOException("Cannot find JENKINS_AGENT_WORKDIR in " + nodeContext.getPodName()));
+                var work = new FilePath(launcher.getChannel(), workspaceToAgent + "/container-work");
                 var bootstrap = work.child("bootstrap.sh");
                 if (!bootstrap.exists()) {
                     work.mkdirs();
@@ -145,12 +154,8 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                 procDir.mkdirs();
                 var f = procDir.child("script.sh");
                 var sb = new StringBuilder();
-                var pwd = starter.pwd();
-                if (pwd != null) {
-                    sb.append("cd ");
-                    quote(sb, pwd.getRemote());
-                    sb.append("\n");
-                }
+                var pwdF = starter.pwd();
+                var pwd = pwdF != null ? pwdF.getRemote() : null;
                 var envVars = starter.envs();
                 if (node != null) {
                     var c = node.toComputer();
@@ -166,20 +171,44 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                                 .toArray(String[]::new);
                     }
                 }
+                var cmds = starter.cmds();
+                var workspaceToContainer = workspaceVolumeMountPath(
+                                nodeContext.getPod(), c -> c.getName().equals(container))
+                        .findFirst()
+                        .orElse(null);
+                if (workspaceToContainer != null && !workspaceToContainer.equals(workspaceToAgent)) {
+                    LOGGER.info("TODO translating " + workspaceToAgent + " to " + workspaceToContainer);
+                    if (pwd.startsWith(workspaceToAgent + "/")) {
+                        pwd = workspaceToContainer + pwd.substring(workspaceToAgent.length());
+                    }
+                    // e.g., various paths created by BourneShellScript wrapper:
+                    cmds = cmds.stream()
+                            .map(s -> s.replaceAll(workspaceToAgent, workspaceToContainer))
+                            .toList();
+                    // $WORKSPACE, $WORKSPACE_TMP
+                    envVars = Stream.of(envVars)
+                            .map(s -> s.replaceAll(workspaceToAgent, workspaceToContainer))
+                            .toArray(String[]::new);
+                }
+                if (pwd != null) {
+                    sb.append("cd ");
+                    quote(sb, pwd);
+                    sb.append("\n");
+                }
                 for (var env : envVars) {
                     sb.append("export ");
                     quote(sb, env);
                     sb.append("\n");
                 }
                 // TODO quiet & masks
-                for (var cmd : starter.cmds()) {
+                for (var cmd : cmds) {
                     cmd = cmd.replace("$$", "$"); // undo BourneShellScript.scriptLauncherCmd
                     quote(sb, cmd);
                     sb.append(" ");
                 }
                 f.write(sb.toString(), null);
                 LOGGER.info("TODO wrote to " + f + ": \n" + sb);
-            } catch (InterruptedException x) {
+            } catch (InterruptedException | KubernetesAuthException x) {
                 throw new IOException(x);
             }
             return new Proc() {
@@ -255,9 +284,15 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
         sb.append("'");
     }
 
-    // TODO look up actual mountPath of workspace-volume mount
-    private static String work() {
-        return ContainerTemplate.DEFAULT_WORKING_DIR + "/container-work";
+    private static Stream<String> workspaceVolumeMountPath(Container container) {
+        return container.getVolumeMounts().stream()
+                .filter(vm -> vm.getName().equals(PodTemplateBuilder.WORKSPACE_VOLUME_NAME))
+                .map(VolumeMount::getMountPath);
+    }
+
+    private static Stream<String> workspaceVolumeMountPath(Pod pod, Predicate<Container> container) {
+        return pod.getSpec().getContainers().stream()
+                .flatMap(c -> container.test(c) ? workspaceVolumeMountPath(c) : Stream.of());
     }
 
     @Extension
@@ -271,14 +306,20 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                     var cmds = c.getCommand();
                     if (cmds != null && !cmds.isEmpty() && cmds.get(0).matches("((/usr)?/bin/)?(sleep|cat)")) {
                         var name = c.getName();
+                        var workspace = workspaceVolumeMountPath(c).findFirst().orElse(null);
+                        if (workspace == null) {
+                            LOGGER.warning(() -> "Cannot find " + PodTemplateBuilder.WORKSPACE_VOLUME_NAME + " in "
+                                    + name + " in " + pod.getMetadata().getName());
+                            continue;
+                        }
                         c.setCommand(List.of("sh"));
                         c.setArgs(
                                 List.of(
                                         "-c",
                                         "until test -f \"$JENKINS_CONTAINER_WORK\"/bootstrap.sh; do sleep 1; done; . \"$JENKINS_CONTAINER_WORK\"/bootstrap.sh"));
                         var env = new ArrayList<>(c.getEnv() != null ? c.getEnv() : List.of());
-                        env.add(new EnvVar("JENKINS_CONTAINER_WORK", work(), null));
                         env.add(new EnvVar("JENKINS_CONTAINER_NAME", name, null));
+                        env.add(new EnvVar("JENKINS_CONTAINER_WORK", workspace + "/container-work", null));
                         c.setEnv(env);
                         LOGGER.info(() -> "adjusted container " + name + " in "
                                 + pod.getMetadata().getName());
