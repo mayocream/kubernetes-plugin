@@ -46,7 +46,6 @@ import org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud;
 import org.csanchez.jenkins.plugins.kubernetes.KubernetesSlave;
 import org.csanchez.jenkins.plugins.kubernetes.PodTemplateBuilder;
 import org.csanchez.jenkins.plugins.kubernetes.pod.decorator.PodDecorator;
-import org.jenkinsci.plugins.kubernetes.auth.KubernetesAuthException;
 
 /**
  * Alternative to {@link ContainerExecDecorator} which does not rely on the API server.
@@ -63,48 +62,48 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
     private static final long serialVersionUID = 1;
 
     private final String container;
-    private final KubernetesNodeContext nodeContext;
 
-    ContainerListenDecorator(String container, KubernetesNodeContext nodeContext) {
+    ContainerListenDecorator(String container) {
         this.container = container;
-        this.nodeContext = nodeContext;
     }
 
     @Override
     public Launcher decorate(Launcher launcher, Node node) {
-        if (node != null && !(node instanceof KubernetesSlave)) {
+        if (!(node instanceof KubernetesSlave ks)) {
+            LOGGER.warning(() -> "container step used on unexpected node " + node);
             return launcher;
         }
+        var podO = ks.getPod();
+        if (!podO.isPresent()) {
+            LOGGER.warning(() -> "container step used " + node + " but Pod could not be looked up");
+            return launcher;
+        }
+        var pod = podO.get();
         launcher = undecorate(launcher);
         try {
-            var pod = nodeContext.getPod();
-            if (pod != null) {
-                var c = pod.getSpec().getContainers().stream()
-                        .filter(_c -> container.equals(_c.getName()))
-                        .findFirst()
-                        .orElse(null);
-                if (c != null) {
-                    if (c.getEnv() == null
-                            || !c.getEnv().stream().anyMatch(e -> e.getName().equals("JENKINS_CONTAINER_NAME"))) {
-                        launcher.getListener()
-                                .getLogger()
-                                .println("Warning: container step on unpatched container " + c.getName());
-                        return launcher;
-                    }
-                } else {
-                    LOGGER.warning(() -> "Could not find container " + container + " in " + nodeContext.getPodName());
+            var c = pod.getSpec().getContainers().stream()
+                    .filter(_c -> container.equals(_c.getName()))
+                    .findFirst()
+                    .orElse(null);
+            if (c != null) {
+                if (c.getEnv() == null
+                        || !c.getEnv().stream().anyMatch(e -> e.getName().equals("JENKINS_CONTAINER_NAME"))) {
+                    launcher.getListener()
+                            .getLogger()
+                            .println("Warning: container step on unpatched container " + c.getName());
+                    return launcher;
                 }
             } else {
-                LOGGER.warning(() -> "Could not find pod " + nodeContext.getPodName());
+                LOGGER.warning(() -> "Could not find container " + container + " in " + ks.getPodName());
             }
         } catch (Exception x) {
             LOGGER.log(
                     Level.WARNING,
                     x,
-                    () -> "Could not verify eligibility of container " + container + " in " + nodeContext.getPodName());
+                    () -> "Could not verify eligibility of container " + container + " in " + ks.getPodName());
         }
         LOGGER.info("TODO prepping launcher for " + container);
-        return new LauncherImpl(launcher, node);
+        return new LauncherImpl(launcher, ks, pod);
     }
 
     private static final Launcher undecorate(Launcher launcher) {
@@ -121,11 +120,13 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
     }
 
     private class LauncherImpl extends Launcher.DecoratedLauncher {
-        private final Node node;
+        private final KubernetesSlave ks;
+        private final Pod pod;
 
-        public LauncherImpl(Launcher base, Node node) {
+        public LauncherImpl(Launcher base, KubernetesSlave ks, Pod pod) {
             super(base);
-            this.node = node;
+            this.ks = ks;
+            this.pod = pod;
         }
 
         @Override
@@ -135,11 +136,10 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
             }
             FilePath procDir;
             try {
-                var workspaceToAgent = workspaceVolumeMountPath(nodeContext.getPod(), c -> c.getEnv().stream()
+                var workspaceToAgent = workspaceVolumeMountPath(pod, c -> c.getEnv().stream()
                                 .anyMatch(e -> e.getName().equals("JENKINS_AGENT_WORKDIR")))
                         .findFirst()
-                        .orElseThrow(() ->
-                                new IOException("Cannot find JENKINS_AGENT_WORKDIR in " + nodeContext.getPodName()));
+                        .orElseThrow(() -> new IOException("Cannot find JENKINS_AGENT_WORKDIR in " + ks.getPodName()));
                 var work = new FilePath(getChannel(), workspaceToAgent + "/container-work");
                 var bootstrap = work.child("bootstrap.sh");
                 if (!bootstrap.exists()) {
@@ -155,23 +155,21 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                 var pwdF = starter.pwd();
                 var pwd = pwdF != null ? pwdF.getRemote() : null;
                 var envVars = starter.envs();
-                if (node != null) {
-                    var c = node.toComputer();
-                    if (c != null) {
-                        // Remove env vars which are simply inherited from the agent container’s environment.
-                        // Some of these like $JAVA_HOME could be unnecessary or even harmful in other containers.
-                        var agentEnv = c.getEnvironment();
-                        envVars = Stream.of(envVars)
-                                .filter(kv -> {
-                                    var split = kv.split("=", 2);
-                                    return split.length == 2 && !split[1].equals(agentEnv.get(split[0]));
-                                })
-                                .toArray(String[]::new);
-                    }
+                var kc = ks.toComputer();
+                if (kc != null) {
+                    // Remove env vars which are simply inherited from the agent container’s environment.
+                    // Some of these like $JAVA_HOME could be unnecessary or even harmful in other containers.
+                    var agentEnv = kc.getEnvironment();
+                    envVars = Stream.of(envVars)
+                            .filter(kv -> {
+                                var split = kv.split("=", 2);
+                                return split.length == 2 && !split[1].equals(agentEnv.get(split[0]));
+                            })
+                            .toArray(String[]::new);
                 }
                 var cmds = starter.cmds();
                 var workspaceToContainer = workspaceVolumeMountPath(
-                                nodeContext.getPod(), c -> c.getName().equals(container))
+                                pod, c -> c.getName().equals(container))
                         .findFirst()
                         .orElse(null);
                 if (workspaceToContainer != null && !workspaceToContainer.equals(workspaceToAgent)) {
@@ -206,7 +204,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                 }
                 f.write(sb.toString(), null);
                 LOGGER.info("TODO wrote to " + f + ": \n" + sb);
-            } catch (InterruptedException | KubernetesAuthException x) {
+            } catch (InterruptedException x) {
                 throw new IOException(x);
             }
             return new Proc() {

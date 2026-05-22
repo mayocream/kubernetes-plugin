@@ -72,7 +72,7 @@ public class ContainerStepExecution extends StepExecution {
         }
 
         if (ContainerListenDecorator.ENABLED) {
-            listenDecorator = new ContainerListenDecorator(containerName, nodeContext);
+            listenDecorator = new ContainerListenDecorator(containerName);
             // TODO handle globalVars, rcEnvVars, shell if needed (basic env filtering is implemented)
         } else {
             decorator = new ContainerExecDecorator();
