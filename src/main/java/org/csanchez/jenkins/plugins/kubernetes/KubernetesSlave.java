@@ -402,8 +402,10 @@ public class KubernetesSlave extends AbstractCloudSlave {
         // the slave pod's current state and the pod retention policy.
         // Healthy slave pods should still have a JNLP agent running at this point.
         boolean deletePod = getPodRetention(cloud)
-                .shouldDeletePod(cloud, () -> KubernetesCloud.getPodResource(client, getNamespace(), name)
-                        .get());
+                .shouldDeletePod(
+                        cloud,
+                        () -> KubernetesCloud.getPodResource(client, getNamespace(), name)
+                                .get());
 
         Computer computer = toComputer();
         if (computer == null) {
