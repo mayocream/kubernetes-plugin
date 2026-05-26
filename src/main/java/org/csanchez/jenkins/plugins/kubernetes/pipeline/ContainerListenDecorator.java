@@ -196,7 +196,6 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                     quote(sb, env);
                     sb.append("\n");
                 }
-                // TODO quiet & masks
                 for (var cmd : cmds) {
                     cmd = cmd.replace("$$", "$"); // undo BourneShellScript.scriptLauncherCmd
                     quote(sb, cmd);
@@ -204,6 +203,10 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                 }
                 f.write(sb.toString(), null);
                 LOGGER.info("TODO wrote to " + f + ": \n" + sb);
+                if (!starter.quiet()) {
+                    maskedPrintCommandLine(
+                            cmds, starter.masks(), pwd != null ? new FilePath(pwdF.getChannel(), pwd) : null);
+                }
             } catch (InterruptedException x) {
                 throw new IOException(x);
             }
