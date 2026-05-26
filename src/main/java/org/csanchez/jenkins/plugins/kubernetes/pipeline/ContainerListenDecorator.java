@@ -94,7 +94,8 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                     return launcher;
                 }
             } else {
-                LOGGER.warning(() -> "Could not find container " + container + " in " + ks.getPodName());
+                launcher.getListener().getLogger().println("Warning: could not find container " + container);
+                return launcher;
             }
         } catch (Exception x) {
             LOGGER.log(
