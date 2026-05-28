@@ -40,6 +40,7 @@ import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.random.RandomGenerator;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import jenkins.util.SystemProperties;
 import org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud;
@@ -121,6 +122,9 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
     }
 
     private class LauncherImpl extends Launcher.DecoratedLauncher {
+
+        private static final Pattern BASH_COMPLIANT_ENV_VAR = Pattern.compile("[a-zA-Z_][a-zA-Z0-9_]*");
+
         private final KubernetesSlave ks;
         private final Pod pod;
 
@@ -195,6 +199,16 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                     sb.append("\n");
                 }
                 for (var env : envVars) {
+                    int i = env.indexOf('=');
+                    if (i == -1) {
+                        LOGGER.warning(() -> "Malformed env keypair " + env + " in " + ks.getPodName());
+                        continue;
+                    }
+                    var k = env.substring(0, i);
+                    if (!BASH_COMPLIANT_ENV_VAR.matcher(k).matches()) {
+                        listener.getLogger().println("Ignoring unsupported env var " + k);
+                        continue;
+                    }
                     sb.append("export ");
                     quote(sb, env);
                     sb.append("\n");
