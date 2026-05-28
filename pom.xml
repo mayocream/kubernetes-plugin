@@ -50,6 +50,7 @@
     <spotbugs.threshold>Low</spotbugs.threshold>
     <spotless.check.skip>false</spotless.check.skip>
     <banObsoleteDependencyOverrides.skip>false</banObsoleteDependencyOverrides.skip>
+    <jenkins-test-harness.version>2573.vd91b_8a_43e019</jenkins-test-harness.version>
   </properties>
 
   <dependencyManagement>
