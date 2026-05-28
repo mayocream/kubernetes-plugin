@@ -36,6 +36,7 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -236,8 +237,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
 
                 @Override
                 public void kill() throws IOException, InterruptedException {
-                    // TODO could touch some death flag
-                    procDir.child("status.txt").write("-1", null);
+                    // Unused?
                 }
 
                 @Override
@@ -284,6 +284,24 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                     return OutputStream.nullOutputStream();
                 }
             };
+        }
+
+        @Override
+        public void kill(Map<String, String> modelEnvVars) throws IOException, InterruptedException {
+            if (modelEnvVars.size() != 1) {
+                throw new AbortException("unexpected environment for killing: " + modelEnvVars);
+            }
+            var e = modelEnvVars.entrySet().iterator().next();
+            var exitCode = launch(launch().quiet(true)
+                            .cmds(
+                                    "sh",
+                                    "-c",
+                                    "kill `grep -l '" + e.getKey() + "=" + e.getValue()
+                                            + "' /proc/*/environ | cut -d / -f 3 `"))
+                    .join();
+            if (exitCode != 0) {
+                throw new AbortException("Attempt to gracefully kill " + e + " failed: " + exitCode);
+            }
         }
     }
 
