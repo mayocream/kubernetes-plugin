@@ -64,9 +64,11 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
     private static final long serialVersionUID = 1;
 
     private final String container;
+    private final String shell;
 
-    ContainerListenDecorator(String container) {
+    ContainerListenDecorator(String container, String shell) {
         this.container = container;
+        this.shell = shell;
     }
 
     @Override
@@ -158,6 +160,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                 procDir = work.child(container)
                         .child("%016x".formatted(RandomGenerator.getDefault().nextLong()));
                 procDir.mkdirs();
+                procDir.child("shell.txt").write(shell != null ? shell : "sh", null);
                 var f = procDir.child("script.sh");
                 var sb = new StringBuilder();
                 var pwdF = starter.pwd();

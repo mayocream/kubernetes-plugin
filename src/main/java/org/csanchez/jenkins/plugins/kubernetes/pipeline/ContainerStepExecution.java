@@ -72,8 +72,8 @@ public class ContainerStepExecution extends StepExecution {
         }
 
         if (ContainerListenDecorator.ENABLED) {
-            listenDecorator = new ContainerListenDecorator(containerName);
-            // TODO handle globalVars, rcEnvVars, shell if needed (basic env filtering is implemented)
+            // TODO what are globalVars & rcEnvVars for? Not needed by any known tests.
+            listenDecorator = new ContainerListenDecorator(containerName, shell);
         } else {
             decorator = new ContainerExecDecorator();
             decorator.setNodeContext(nodeContext);

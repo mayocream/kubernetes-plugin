@@ -133,7 +133,6 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
                 .getDescriptorByType(GlobalDefaultFlowDurabilityLevel.DescriptorImpl.class)
                 .setDurabilityHint(FlowDurabilityHint.PERFORMANCE_OPTIMIZED);
         deletePods(cloud.connect(), getLabels(cloud, this, name), false);
-        assertNotNull(createJobThenScheduleRun());
     }
 
     /**
@@ -164,6 +163,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Issue("JENKINS-57993")
     @Test
     public void runInPod() throws Exception {
+        createJobThenScheduleRun();
         warnings.record("", Level.WARNING).capture(1000);
         SemaphoreStep.waitForStart("podTemplate/1", b);
         List<PodTemplate> templates = podTemplatesWithLabel(name.getMethodName(), cloud.getAllTemplates());
@@ -257,6 +257,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void runIn2Pods() throws Exception {
+        createJobThenScheduleRun();
         SemaphoreStep.waitForStart("podTemplate1/1", b);
         String label1 = name.getMethodName() + "-1";
         PodTemplate template1 =
@@ -295,6 +296,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Issue({"JENKINS-57893", "SECURITY-3079"})
     @Test
     public void runInPodFromYaml() throws Exception {
+        createJobThenScheduleRun();
         List<PodTemplate> templates = cloud.getTemplates();
         while (templates.isEmpty()) {
             LOGGER.log(Level.INFO, "Waiting for template to be created");
@@ -332,19 +334,26 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void runInPodWithDifferentShell() throws Exception {
+        System.setProperty("org.jenkinsci.plugins.durabletask.BourneShellScript.LAUNCH_DIAGNOSTICS", "true");
+        createJobThenScheduleRun();
         r.assertBuildStatus(Result.FAILURE, r.waitForCompletion(b));
-        r.assertLogContains("ERROR: Process exited immediately after creation", b);
-        // r.assertLogContains("/bin/bash: no such file or directory", b); // Not printed in CI for an unknown reason.
+        assertThat(
+                b,
+                anyOf(
+                        logContains("ERROR: Process exited immediately after creation"),
+                        logContains("/bin/bash: not found")));
     }
 
     @Test
     public void bourneShellElsewhereInPath() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         r.assertLogContains("/kaniko:/busybox", b);
     }
 
     @Test
     public void inheritFrom() throws Exception {
+        createJobThenScheduleRun();
         PodTemplate standard = new PodTemplate();
         standard.setName("standard");
         cloud.addTemplate(standard);
@@ -353,6 +362,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void runInPodWithMultipleContainers() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         r.assertLogContains("image: \"maven:3.3.9-jdk-8-alpine\"", b);
         r.assertLogContains("image: \"golang:1.6.3-alpine\"", b);
@@ -363,6 +373,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void runInPodNested() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         r.assertLogContains("image: \"maven:3.3.9-jdk-8-alpine\"", b);
         r.assertLogContains("image: \"golang:1.6.3-alpine\"", b);
@@ -373,6 +384,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Issue("JENKINS-57548")
     @Test
     public void runInPodNestedExplicitInherit() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         r.assertLogContains("image: \"maven:3.3.9-jdk-8-alpine\"", b);
         r.assertLogNotContains("image: \"golang:1.6.3-alpine\"", b);
@@ -383,6 +395,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Issue({"JENKINS-57893", "JENKINS-58540"})
     @Test
     public void runInPodWithExistingTemplate() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         r.assertLogContains("outside container", b);
         r.assertLogContains("inside container", b);
@@ -392,6 +405,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Issue({"JENKINS-57893", "JENKINS-58540"})
     @Test
     public void runWithEnvVariables() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         assertEnvVars(r, b);
         r.assertLogContains("OUTSIDE_CONTAINER_BUILD_NUMBER = 1\n", b);
@@ -417,6 +431,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void runWithEnvVariablesInContext() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         r.assertLogContains("The initial value of POD_ENV_VAR is pod-env-var-value", b);
         r.assertLogContains("The value of POD_ENV_VAR outside container is /bin/mvn:pod-env-var-value", b);
@@ -464,6 +479,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void runWithOverriddenEnvVariables() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         r.assertLogContains("OUTSIDE_CONTAINER_HOME_ENV_VAR = /home/jenkins\n", b);
         r.assertLogContains("INSIDE_CONTAINER_HOME_ENV_VAR = /root\n", b);
@@ -473,6 +489,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void supportComputerEnvVars() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         r.assertLogContains("BUSYBOX_BUILD_NUMBER: 1\n", b);
         r.assertLogContains("JNLP_BUILD_NUMBER: 1\n", b);
@@ -481,6 +498,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void runDirContext() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         String workspace = "/home/jenkins/agent/workspace/" + getProjectName();
         r.assertLogContains("initpwd is -" + workspace + "-", b);
@@ -490,12 +508,14 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void runInPodWithLivenessProbe() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         r.assertLogContains("Still alive", b);
     }
 
     @Test
     public void podTemplateWithMultipleLabels() throws Exception {
+        createJobThenScheduleRun();
         PodTemplate pt = new PodTemplate();
         pt.setName("podTemplate");
         pt.setLabel("label1 label2");
@@ -524,6 +544,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void runWithActiveDeadlineSeconds() throws Exception {
+        createJobThenScheduleRun();
         SemaphoreStep.waitForStart("podTemplate/1", b);
         PodTemplate deadlineTemplate = cloud.getAllTemplates().stream()
                 .filter(x -> name.getMethodName().equals(x.getLabel()))
@@ -538,6 +559,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void runInPodWithRetention() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         System.out.println("Deleting leftover pods");
         KubernetesClient client = cloud.connect();
@@ -548,6 +570,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Issue("JENKINS-49707")
     @Test
     public void terminatedPod() throws Exception {
+        createJobThenScheduleRun();
         logs.record(KubernetesAgentErrorCondition.class, Level.FINE);
         r.waitForMessage("+ sleep", b);
         deletePods(cloud.connect(), getLabels(this, name), false);
@@ -561,6 +584,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Issue("JENKINS-59340")
     @Test
     public void containerTerminated() throws Exception {
+        createJobThenScheduleRun();
         assertBuildStatus(r.waitForCompletion(b), Result.FAILURE, Result.ABORTED);
         r.waitForMessage("Container stress-ng was terminated", b);
         /* TODO sometimes instead get: Container stress-ng was terminated (Exit Code: 0, Reason: Completed)
@@ -570,6 +594,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void errorPod() throws Exception {
+        createJobThenScheduleRun();
         r.waitForMessage("jnlp -- terminated (1)", b);
         r.waitForMessage("Foo", b);
         r.assertBuildStatus(Result.ABORTED, r.waitForCompletion(b));
@@ -578,12 +603,14 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Issue("JENKINS-59340")
     @Test
     public void podDeadlineExceeded() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatus(Result.ABORTED, r.waitForCompletion(b));
         r.waitForMessage(POD_DEADLINE_EXCEEDED_MESSAGE, b);
     }
 
     @Test
     public void podDeadlineExceededGlobalTemplate() throws Exception {
+        createJobThenScheduleRun();
         PodTemplate podTemplate = new PodTemplate("podDeadlineExceededGlobalTemplate");
         podTemplate.setLabel("podDeadlineExceededGlobalTemplate");
         podTemplate.setActiveDeadlineSeconds(30);
@@ -595,6 +622,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void interruptedPod() throws Exception {
+        createJobThenScheduleRun();
         r.waitForMessage("starting to sleep", b);
         b.getExecutor().interrupt();
         r.assertBuildStatus(Result.ABORTED, r.waitForCompletion(b));
@@ -604,6 +632,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Issue("JENKINS-58306")
     @Test
     public void cascadingDelete() throws Exception {
+        createJobThenScheduleRun();
         try {
             cloud.connect().apps().deployments().withName("cascading-delete").delete();
             assumeNotNull(cloud.connect().serviceAccounts().withName("jenkins").get());
@@ -628,6 +657,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Test
     @Ignore
     public void computerCantBeConfigured() throws Exception {
+        createJobThenScheduleRun();
         r.jenkins.setSecurityRealm(r.createDummySecurityRealm());
         r.jenkins.setAuthorizationStrategy(new MockAuthorizationStrategy()
                 .grant(Jenkins.MANAGE)
@@ -661,6 +691,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Issue("JENKINS-57717")
     @Test
     public void runInPodWithShowRawYamlFalse() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         r.assertLogNotContains("value: \"container-env-var-value\"", b);
     }
@@ -668,6 +699,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Issue("JENKINS-58574")
     @Test
     public void showRawYamlFalseInherited() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         r.assertLogNotContains("value: \"container-env-var-value\"", b);
     }
@@ -675,18 +707,21 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Test
     @Issue("JENKINS-58405")
     public void overrideYaml() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
     }
 
     @Test
     @Issue("JENKINS-58405")
     public void mergeYaml() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
     }
 
     @Test
     @Issue("JENKINS-58602")
     public void jenkinsSecretHidden() throws Exception {
+        createJobThenScheduleRun();
         SemaphoreStep.waitForStart("pod/1", b);
         Optional<SlaveComputer> scOptional = Arrays.stream(r.jenkins.getComputers())
                 .filter(SlaveComputer.class::isInstance)
@@ -701,18 +736,21 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void jnlpWorkingDir() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
     }
 
     @Issue("JENKINS-61178")
     @Test
     public void sidecarWorkingDir() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
     }
 
     @Issue("JENKINS-60517")
     @Test
     public void runInDynamicallyCreatedContainer() throws Exception {
+        createJobThenScheduleRun();
         List<PodTemplate> templates = cloud.getTemplates();
         while (templates.isEmpty()) {
             LOGGER.log(Level.INFO, "Waiting for template to be created");
@@ -731,6 +769,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Test
     public void basicWindows() throws Exception {
         assumeWindows(WINDOWS_1809_BUILD);
+        createJobThenScheduleRun();
         cloud.setDirectConnection(false); // not yet supported by
         // https://github.com/jenkinsci/docker-inbound-agent/blob/517ccd68fd1ce420e7526ca6a40320c9a47a2c18/jenkins-agent.ps1
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
@@ -742,6 +781,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Test
     public void windowsContainer() throws Exception {
         assumeWindows(WINDOWS_1809_BUILD);
+        createJobThenScheduleRun();
         cloud.setDirectConnection(false);
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         r.assertLogContains("Directory of C:\\home\\jenkins\\agent\\workspace\\windows Container\\subdir", b);
@@ -753,6 +793,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Ignore("Does not appear fixable: https://github.com/jenkinsci/kubernetes-plugin/pull/1724#discussion_r2287512410")
     public void interruptedPodWindows() throws Exception {
         assumeWindows(WINDOWS_1809_BUILD);
+        createJobThenScheduleRun();
         cloud.setDirectConnection(false);
         r.waitForMessage("starting to sleep", b);
         b.getExecutor().interrupt();
@@ -768,6 +809,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     // a big checkout that locks some files and prevents next steps to execute
     public void killsProcessesWindows() throws Exception {
         assumeWindows(WINDOWS_1809_BUILD);
+        createJobThenScheduleRun();
         cloud.setDirectConnection(false);
         r.assertBuildStatus(Result.ABORTED, r.waitForCompletion(b));
         r.assertLogContains("\"It worked!\"", b);
@@ -776,6 +818,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Test
     public void secretMaskingWindows() throws Exception {
         assumeWindows(WINDOWS_1809_BUILD);
+        createJobThenScheduleRun();
         cloud.setDirectConnection(false);
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         r.assertLogContains(
@@ -800,6 +843,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     }
 
     private void dynamicPVC() throws Exception {
+        createJobThenScheduleRun();
         assumePvcAccess();
         var client = cloud.connect();
         SemaphoreStep.waitForStart("before/1", b);
@@ -849,6 +893,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void invalidPodGetsCancelled() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatus(Result.ABORTED, r.waitForCompletion(b));
         r.assertLogContains("ERROR: Unable to create pod", b);
         r.assertLogContains("Queue task was cancelled", b);
@@ -857,6 +902,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Test
     public void invalidImageGetsCancelled() throws Exception {
         Reaper.TerminateAgentOnImagePullBackOff.BACKOFF_EVENTS_LIMIT = 2;
+        createJobThenScheduleRun();
         r.assertBuildStatus(Result.ABORTED, r.waitForCompletion(b));
         r.assertLogContains("Image pull backoff detected, waiting for image to be available.", b);
         r.assertLogContains("Queue task was cancelled", b);
@@ -865,6 +911,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
     @Issue("SECURITY-1646")
     @Test
     public void substituteEnv() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         String home = System.getenv("HOME");
         assumeNotNull(home);
@@ -877,6 +924,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void octalPermissions() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
     }
 
@@ -893,6 +941,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void cancelOnlyRelevantQueueItem() throws Exception {
+        createJobThenScheduleRun();
         r.waitForMessage("cancelled pod item by now", b);
         r.createOnlineSlave(Label.get("special-agent"));
         r.assertBuildStatus(Result.ABORTED, r.waitForCompletion(b));
@@ -901,6 +950,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void garbageCollection() throws Exception {
+        createJobThenScheduleRun();
         // Pod exists, need to kill the build, delete the agent without deleting the pod.
         // Wait for the timeout to expire and check that the pod is deleted.
         var garbageCollection = new GarbageCollection();
@@ -930,6 +980,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void handleEviction() throws Exception {
+        createJobThenScheduleRun();
         SemaphoreStep.waitForStart("pod/1", b);
         var client = cloud.connect();
         var pod = client.pods()
@@ -947,6 +998,7 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void decoratorFailure() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatus(Result.ABORTED, r.waitForCompletion(b));
         r.assertLogContains("I always fail", b);
         assertThat("Node should have been removed", r.jenkins.getNodes(), empty());
@@ -963,11 +1015,13 @@ public class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     public void imageWithoutAgent() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatus(Result.SUCCESS, r.waitForCompletion(b));
     }
 
     @Test
     public void imageWithoutAgentNoJava() throws Exception {
+        createJobThenScheduleRun();
         r.assertBuildStatus(Result.ABORTED, r.waitForCompletion(b));
         // Fails with older launcher scripts due to missing Java.
         // But Busybox also lacks Bash, used in newer scripts.

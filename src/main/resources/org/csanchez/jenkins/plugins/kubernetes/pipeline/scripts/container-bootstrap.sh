@@ -11,7 +11,7 @@ do
     then
       echo "Handling $procdir"
       touch "$procdir/seen"
-      sh "$procdir/script.sh" <&- >"$procdir/out.txt" 2>"$procdir/err.txt"
+      `cat "$procdir/shell.txt"` "$procdir/script.sh" <&- >"$procdir/out.txt" 2>"$procdir/err.txt"
       r=$?
       echo $r >"$procdir/status.txt"
       echo "Completed $procdir with status $r"
