@@ -41,7 +41,6 @@ public class KubernetesLauncherTest {
     @WithoutJenkins
     @Test
     public void isResourceQuotaUpdateConflict_unrelated409() {
-        assertFalse(
-                KubernetesLauncher.isResourceQuotaUpdateConflict(409, "pods \"my-pod\" already exists"));
+        assertFalse(KubernetesLauncher.isResourceQuotaUpdateConflict(409, "pods \"my-pod\" already exists"));
     }
 }
