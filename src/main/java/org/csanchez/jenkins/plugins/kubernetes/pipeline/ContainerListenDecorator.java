@@ -43,7 +43,6 @@ import java.util.logging.Logger;
 import java.util.random.RandomGenerator;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-import jenkins.util.SystemProperties;
 import org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud;
 import org.csanchez.jenkins.plugins.kubernetes.KubernetesSlave;
 import org.csanchez.jenkins.plugins.kubernetes.PodTemplateBuilder;
@@ -54,9 +53,6 @@ import org.csanchez.jenkins.plugins.kubernetes.pod.decorator.PodDecorator;
  * “Sleepy” containers are automatically switched to listen for commands from the agent container.
  */
 final class ContainerListenDecorator extends LauncherDecorator implements Serializable, Closeable {
-
-    static final boolean ENABLED =
-            SystemProperties.getBoolean(ContainerListenDecorator.class.getName() + ".enabled", true);
 
     private static final Logger LOGGER = Logger.getLogger(ContainerListenDecorator.class.getName());
 
@@ -337,7 +333,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
 
         @Override
         public Pod decorate(KubernetesCloud kubernetesCloud, Pod pod) {
-            if (ENABLED) {
+            if (kubernetesCloud.isActiveContainers()) {
                 // TODO exclude Windows
                 for (var c : pod.getSpec().getContainers()) {
                     var cmds = c.getCommand();

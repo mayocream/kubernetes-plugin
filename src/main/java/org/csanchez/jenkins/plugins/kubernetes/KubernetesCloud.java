@@ -173,6 +173,9 @@ public class KubernetesCloud extends Cloud implements PodTemplateGroup {
     @CheckForNull
     private GarbageCollection garbageCollection;
 
+    /** @see ContainerListenDecorator */
+    private boolean activeContainers = true; // TODO do not enable by default
+
     @NonNull
     private DescribableList<KubernetesCloudTrait, KubernetesCloudTraitDescriptor> traits =
             new DescribableList<>(Saveable.NOOP);
@@ -377,6 +380,14 @@ public class KubernetesCloud extends Cloud implements PodTemplateGroup {
         this.garbageCollection = garbageCollection;
     }
 
+    public boolean isActiveContainers() {
+        return activeContainers;
+    }
+
+    @DataBoundSetter
+    public void setActiveContainers(boolean activeContainers) {
+        this.activeContainers = activeContainers;
+    }
     /**
      * Get list of traits enabled for this cloud.
      * @return configured traits, never null

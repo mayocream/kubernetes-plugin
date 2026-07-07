@@ -71,7 +71,7 @@ public class ContainerStepExecution extends StepExecution {
             rcEnvVars = run.getEnvironment(taskListener);
         }
 
-        if (ContainerListenDecorator.ENABLED) {
+        if (nodeContext.getKubernetesSlave().getKubernetesCloud().isActiveContainers()) {
             // TODO what are globalVars & rcEnvVars for? Not needed by any known tests.
             listenDecorator = new ContainerListenDecorator(containerName, shell);
         } else {
