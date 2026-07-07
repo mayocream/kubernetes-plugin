@@ -45,7 +45,7 @@ public class KubernetesSamplesTest extends AbstractKubernetesPipelineTest {
     @Test
     public void smokes() throws Exception {
         for (GroovySample gs : ExtensionList.lookup(GroovySample.class)) {
-            if (gs.name().equals("kubernetes-windows") && !isWindows(null)) {
+            if (gs.name().equals("kubernetes-windows") && !isWindows(WINDOWS_LTSC_2022_BUILD)) {
                 System.err.println("==== Skipping " + gs.title() + " ====");
                 continue;
             }

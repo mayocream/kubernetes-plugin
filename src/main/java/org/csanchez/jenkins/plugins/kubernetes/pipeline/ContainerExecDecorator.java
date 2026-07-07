@@ -623,8 +623,8 @@ public class ContainerExecDecorator extends LauncherDecorator implements Seriali
                     if (!launcher.isUnix() && toggleOutputForCaller != null) {
                         // Windows welcome message should not be sent to the caller as it is a side-effect of calling
                         // the wrapping cmd.exe
-                        // Microsoft Windows [Version 10.0.17763.2686]
-                        // (c) 2018 Microsoft Corporation. All rights reserved.
+                        // Microsoft Windows [Version 10.0.20348.4893]
+                        // (c) Microsoft Corporation. All rights reserved.
                         //
                         // C:\>
                         stream.flush();

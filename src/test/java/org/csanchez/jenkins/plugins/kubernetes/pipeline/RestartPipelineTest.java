@@ -64,6 +64,7 @@ import org.jvnet.hudson.test.Issue;
 import org.jvnet.hudson.test.JenkinsRule;
 import org.jvnet.hudson.test.JenkinsSessionRule;
 import org.jvnet.hudson.test.LoggerRule;
+import org.jvnet.hudson.test.recipes.WithTimeout;
 
 public class RestartPipelineTest {
     protected static final String CONTAINER_ENV_VAR_VALUE = "container-env-var-value";
@@ -221,8 +222,9 @@ public class RestartPipelineTest {
     }
 
     @Test
+    @WithTimeout(value = 900) // in case we need to pull windows docker image
     public void windowsRestart() throws Throwable {
-        assumeWindows(WINDOWS_1809_BUILD);
+        assumeWindows(WINDOWS_LTSC_2022_BUILD);
         AtomicReference<String> projectName = new AtomicReference<>();
         story.then(r -> {
             configureAgentListener();

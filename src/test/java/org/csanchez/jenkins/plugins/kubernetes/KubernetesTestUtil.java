@@ -31,7 +31,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeNoException;
 import static org.junit.Assume.assumeTrue;
 
-import edu.umd.cs.findbugs.annotations.CheckForNull;
 import hudson.Util;
 import io.fabric8.kubernetes.api.model.NamespaceBuilder;
 import io.fabric8.kubernetes.api.model.Node;
@@ -81,7 +80,7 @@ public class KubernetesTestUtil {
     public static final String CONTAINER_ENV_VAR_FROM_SECRET_VALUE = "container-pa55w0rd";
     public static final String POD_ENV_VAR_FROM_SECRET_VALUE = "pod-pa55w0rd";
 
-    public static final String WINDOWS_1809_BUILD = "10.0.17763";
+    public static final String WINDOWS_LTSC_2022_BUILD = "10.0.20348";
 
     public static KubernetesCloud setupCloud(Object test, TestName name) throws KubernetesAuthException, IOException {
         KubernetesCloud cloud = new KubernetesCloud("kubernetes");
@@ -159,7 +158,7 @@ public class KubernetesTestUtil {
         assumeTrue("Cluster seems to contain no Windows nodes with build " + buildNumber, isWindows(buildNumber));
     }
 
-    public static boolean isWindows(@CheckForNull String buildNumber) {
+    public static boolean isWindows(String buildNumber) {
         try (KubernetesClient client = new KubernetesClientBuilder().build()) {
             for (Node n : client.nodes().list().getItems()) {
                 Map<String, String> labels = n.getMetadata().getLabels();
@@ -167,10 +166,8 @@ public class KubernetesTestUtil {
                 String windowsBuild = labels.get("node.kubernetes.io/windows-build");
                 LOGGER.info(() -> "Found node " + n.getMetadata().getName() + " running OS " + os
                         + " with Windows build " + windowsBuild);
-                if ("windows".equals(os)) {
-                    if (buildNumber == null || buildNumber.equals(windowsBuild)) {
-                        return true;
-                    }
+                if ("windows".equals(os) && buildNumber.equals(windowsBuild)) {
+                    return true;
                 }
             }
         }
