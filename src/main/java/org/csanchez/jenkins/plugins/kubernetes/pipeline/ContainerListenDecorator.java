@@ -107,7 +107,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
         return new LauncherImpl(launcher, ks, pod);
     }
 
-    private static final Launcher undecorate(Launcher launcher) {
+    private static Launcher undecorate(Launcher launcher) {
         if (launcher instanceof LauncherImpl decorated) {
             return undecorate(decorated.getInner());
         } else {
@@ -127,7 +127,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
         private final KubernetesSlave ks;
         private final Pod pod;
 
-        public LauncherImpl(Launcher base, KubernetesSlave ks, Pod pod) {
+        LauncherImpl(Launcher base, KubernetesSlave ks, Pod pod) {
             super(base);
             this.ks = ks;
             this.pod = pod;
