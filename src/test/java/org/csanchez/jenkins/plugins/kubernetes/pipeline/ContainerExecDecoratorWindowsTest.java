@@ -24,7 +24,7 @@
 
 package org.csanchez.jenkins.plugins.kubernetes.pipeline;
 
-import static org.csanchez.jenkins.plugins.kubernetes.KubernetesTestUtil.WINDOWS_1809_BUILD;
+import static org.csanchez.jenkins.plugins.kubernetes.KubernetesTestUtil.WINDOWS_LTSC_2022_BUILD;
 import static org.csanchez.jenkins.plugins.kubernetes.KubernetesTestUtil.assumeKubernetes;
 import static org.csanchez.jenkins.plugins.kubernetes.KubernetesTestUtil.assumeWindows;
 import static org.csanchez.jenkins.plugins.kubernetes.KubernetesTestUtil.deletePods;
@@ -99,7 +99,7 @@ public class ContainerExecDecoratorWindowsTest {
     @BeforeClass
     public static void setUpClass() throws Exception {
         assumeKubernetes();
-        assumeWindows(WINDOWS_1809_BUILD);
+        assumeWindows(WINDOWS_LTSC_2022_BUILD);
     }
 
     @Before
@@ -108,7 +108,7 @@ public class ContainerExecDecoratorWindowsTest {
         client = cloud.connect();
         deletePods(client, getLabels(this, name), false);
 
-        String image = "mcr.microsoft.com/windows:" + WINDOWS_1809_BUILD + ".2686";
+        String image = "mcr.microsoft.com/powershell:preview-windowsservercore-ltsc2022";
         String containerName = "container";
         String podName = "test-command-execution-" + RandomStringUtils.random(5, "bcdfghjklmnpqrstvwxz0123456789");
         pod = client.pods()
@@ -125,7 +125,7 @@ public class ContainerExecDecoratorWindowsTest {
                                 .withArgs("Start-Sleep", "2147483")
                                 .build())
                         .addToNodeSelector("kubernetes.io/os", "windows")
-                        .addToNodeSelector("node.kubernetes.io/windows-build", WINDOWS_1809_BUILD)
+                        .addToNodeSelector("node.kubernetes.io/windows-build", WINDOWS_LTSC_2022_BUILD)
                         .withTerminationGracePeriodSeconds(0L)
                         .endSpec()
                         .build());

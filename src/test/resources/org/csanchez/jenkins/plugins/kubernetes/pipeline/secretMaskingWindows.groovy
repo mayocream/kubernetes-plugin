@@ -4,7 +4,7 @@ kind: Pod
 spec:
   containers:
   - name: jnlp
-    image: jenkins/inbound-agent:windowsservercore-1809
+    image: jenkins/inbound-agent:windowsservercore-ltsc2022
     env:
     - name: POD_ENV_VAR_FROM_SECRET
       valueFrom:
@@ -12,7 +12,7 @@ spec:
           key: password
           name: pod-secret
   - name: shell
-    image: mcr.microsoft.com/powershell:preview-windowsservercore-1809
+    image: mcr.microsoft.com/powershell:preview-windowsservercore-ltsc2022
     command:
     - powershell
     args:
@@ -26,7 +26,7 @@ spec:
           name: container-secret
   nodeSelector:
     kubernetes.io/os: windows
-    node.kubernetes.io/windows-build: 10.0.17763
+    node.kubernetes.io/windows-build: 10.0.20348
 ''') {
     node(POD_LABEL) {
         powershell 'echo "INSIDE_POD_ENV_VAR_FROM_SECRET = $Env:POD_ENV_VAR_FROM_SECRET or $($Env:POD_ENV_VAR_FROM_SECRET.ToUpper())"'
