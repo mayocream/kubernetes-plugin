@@ -61,22 +61,28 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
 
     private final String container;
     private final String shell;
+    private final ContainerExecDecorator fallback;
 
-    ContainerListenDecorator(String container, String shell) {
+    ContainerListenDecorator(String container, String shell, ContainerExecDecorator fallback) {
         this.container = container;
         this.shell = shell;
+        this.fallback = fallback;
     }
 
     @Override
     public Launcher decorate(Launcher launcher, Node node) {
+        if (!launcher.isUnix()) {
+            LOGGER.info(() -> "TODO using original implementation on Windows " + node.getNodeName());
+            return fallback.decorate(launcher, node);
+        }
         if (!(node instanceof KubernetesSlave ks)) {
-            LOGGER.warning(() -> "container step used on unexpected node " + node);
-            return launcher;
+            LOGGER.warning(() -> "container step used on unexpected node " + node.getNodeName());
+            return fallback.decorate(launcher, node);
         }
         var podO = ks.getPod();
         if (!podO.isPresent()) {
-            LOGGER.warning(() -> "container step used " + node + " but Pod could not be looked up");
-            return launcher;
+            LOGGER.warning(() -> "container step used " + node.getNodeName() + " but Pod could not be looked up");
+            return fallback.decorate(launcher, node);
         }
         var pod = podO.get();
         launcher = undecorate(launcher);
@@ -91,11 +97,11 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                     launcher.getListener()
                             .getLogger()
                             .println("Warning: container step on unpatched container " + c.getName());
-                    return launcher;
+                    return fallback.decorate(launcher, node);
                 }
             } else {
                 launcher.getListener().getLogger().println("Warning: could not find container " + container);
-                return launcher;
+                return fallback.decorate(launcher, node);
             }
         } catch (Exception x) {
             LOGGER.log(
@@ -103,7 +109,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                     x,
                     () -> "Could not verify eligibility of container " + container + " in " + ks.getPodName());
         }
-        LOGGER.info("TODO prepping launcher for " + container);
+        LOGGER.info(() -> "TODO prepping launcher for " + container + " in " + ks.getPodName());
         return new LauncherImpl(launcher, ks, pod);
     }
 
