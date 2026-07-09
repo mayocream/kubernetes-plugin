@@ -38,11 +38,13 @@ class KubernetesPipelineRJRTest extends AbstractKubernetesPipelineRJRTest {
         try (KubernetesClient client = new KubernetesClientBuilder().build()) {
             String nodeName =
                     client.nodes().list().getItems().get(0).getMetadata().getName();
-            client.nodes().withName(nodeName).edit(n -> new NodeBuilder(n)
-                    .editMetadata()
-                    .addToLabels("disktype", "special")
-                    .endMetadata()
-                    .build());
+            client.nodes()
+                    .withName(nodeName)
+                    .edit(n -> new NodeBuilder(n)
+                            .editMetadata()
+                            .addToLabels("disktype", "special")
+                            .endMetadata()
+                            .build());
 
             // pod connects back and the build finishes correctly
             rjr.runRemotely(new AssertBuildStatusSuccess(build));
@@ -51,11 +53,13 @@ class KubernetesPipelineRJRTest extends AbstractKubernetesPipelineRJRTest {
             try (KubernetesClient client = new KubernetesClientBuilder().build()) {
                 String nodeName =
                         client.nodes().list().getItems().get(0).getMetadata().getName();
-                client.nodes().withName(nodeName).edit(n -> new NodeBuilder(n)
-                        .editMetadata()
-                        .removeFromLabels("disktype")
-                        .endMetadata()
-                        .build());
+                client.nodes()
+                        .withName(nodeName)
+                        .edit(n -> new NodeBuilder(n)
+                                .editMetadata()
+                                .removeFromLabels("disktype")
+                                .endMetadata()
+                                .build());
             }
         }
     }
