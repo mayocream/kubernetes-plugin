@@ -177,9 +177,9 @@ public class KubernetesLauncher extends JNLPLauncher {
                                             namespace,
                                             pod.getMetadata().getName(),
                                             e.getMessage());
-                        } else if (httpCode == 409
-                                && e.getMessage().contains("Operation cannot be fulfilled on resourcequotas")) {
+                        } else if (isResourceQuotaUpdateConflict(httpCode, e.getMessage())) {
                             // See: https://github.com/kubernetes/kubernetes/issues/67761 ; A retry usually works.
+                            // OpenShift ClusterResourceQuota conflicts use clusterresourcequotas.quota.openshift.io.
                             node.getRunListener()
                                     .getLogger()
                                     .printf(
@@ -389,6 +389,19 @@ public class KubernetesLauncher extends JNLPLauncher {
                 }
             }
         }
+    }
+
+    /**
+     * Detects transient quota update conflicts during pod creation.
+     * These occur when concurrent pod creations race to update ResourceQuota or OpenShift ClusterResourceQuota.
+     *
+     * @see <a href="https://github.com/kubernetes/kubernetes/issues/67761">kubernetes#67761</a>
+     */
+    static boolean isResourceQuotaUpdateConflict(int httpCode, @CheckForNull String message) {
+        return httpCode == 409
+                && message != null
+                && message.contains("Operation cannot be fulfilled on")
+                && message.contains("resourcequotas");
     }
 
     /**
