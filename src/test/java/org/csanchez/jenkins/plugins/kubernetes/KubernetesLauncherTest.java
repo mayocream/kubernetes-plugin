@@ -1,12 +1,11 @@
 package org.csanchez.jenkins.plugins.kubernetes;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
 
-import org.junit.Test;
-import org.jvnet.hudson.test.WithoutJenkins;
+import org.junit.jupiter.api.Test;
 
-public class KubernetesLauncherTest {
+class KubernetesLauncherTest {
 
     private static final String K8S_RESOURCE_QUOTA_CONFLICT =
             "Operation cannot be fulfilled on resourcequotas \"compute-resources\": the object has been modified; please apply your changes to the latest version and try again";
@@ -14,33 +13,30 @@ public class KubernetesLauncherTest {
     private static final String OPENSHIFT_CLUSTER_RESOURCE_QUOTA_CONFLICT =
             "Operation cannot be fulfilled on clusterresourcequotas.quota.openshift.io \"dno--notterminating\": the object has been modified; please apply your changes to the latest version and try again";
 
-    @WithoutJenkins
     @Test
-    public void isResourceQuotaUpdateConflict_kubernetesResourceQuota() {
-        assertTrue(KubernetesLauncher.isResourceQuotaUpdateConflict(409, K8S_RESOURCE_QUOTA_CONFLICT));
+    void isResourceQuotaUpdateConflict_kubernetesResourceQuota() {
+        assertThat(KubernetesLauncher.isResourceQuotaUpdateConflict(409, K8S_RESOURCE_QUOTA_CONFLICT), is(true));
     }
 
-    @WithoutJenkins
     @Test
-    public void isResourceQuotaUpdateConflict_openshiftClusterResourceQuota() {
-        assertTrue(KubernetesLauncher.isResourceQuotaUpdateConflict(409, OPENSHIFT_CLUSTER_RESOURCE_QUOTA_CONFLICT));
+    void isResourceQuotaUpdateConflict_openshiftClusterResourceQuota() {
+        assertThat(
+                KubernetesLauncher.isResourceQuotaUpdateConflict(409, OPENSHIFT_CLUSTER_RESOURCE_QUOTA_CONFLICT),
+                is(true));
     }
 
-    @WithoutJenkins
     @Test
-    public void isResourceQuotaUpdateConflict_not409() {
-        assertFalse(KubernetesLauncher.isResourceQuotaUpdateConflict(403, K8S_RESOURCE_QUOTA_CONFLICT));
+    void isResourceQuotaUpdateConflict_not409() {
+        assertThat(KubernetesLauncher.isResourceQuotaUpdateConflict(403, K8S_RESOURCE_QUOTA_CONFLICT), is(false));
     }
 
-    @WithoutJenkins
     @Test
-    public void isResourceQuotaUpdateConflict_nullMessage() {
-        assertFalse(KubernetesLauncher.isResourceQuotaUpdateConflict(409, null));
+    void isResourceQuotaUpdateConflict_nullMessage() {
+        assertThat(KubernetesLauncher.isResourceQuotaUpdateConflict(409, null), is(false));
     }
 
-    @WithoutJenkins
     @Test
-    public void isResourceQuotaUpdateConflict_unrelated409() {
-        assertFalse(KubernetesLauncher.isResourceQuotaUpdateConflict(409, "pods \"my-pod\" already exists"));
+    void isResourceQuotaUpdateConflict_unrelated409() {
+        assertThat(KubernetesLauncher.isResourceQuotaUpdateConflict(409, "pods \"my-pod\" already exists"), is(false));
     }
 }

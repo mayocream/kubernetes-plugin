@@ -23,18 +23,10 @@
  */
 package org.csanchez.jenkins.plugins.kubernetes;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockConstruction;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import io.fabric8.kubernetes.client.KubernetesClient;
 import java.util.function.Consumer;
 import org.csanchez.jenkins.plugins.kubernetes.pod.retention.Always;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.jvnet.hudson.test.Issue;
-import org.mockito.MockedConstruction;
 
 class KubernetesClientProviderTest {
 
