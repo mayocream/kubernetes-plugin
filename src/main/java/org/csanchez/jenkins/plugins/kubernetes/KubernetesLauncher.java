@@ -29,6 +29,7 @@ import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.WARNING;
 
 import edu.umd.cs.findbugs.annotations.CheckForNull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import hudson.Functions;
 import hudson.model.Descriptor;
@@ -71,6 +72,9 @@ public class KubernetesLauncher extends JNLPLauncher {
             Collections.unmodifiableCollection(Arrays.asList("Succeeded", "Failed"));
 
     private static final Logger LOGGER = Logger.getLogger(KubernetesLauncher.class.getName());
+
+    private static final long TEMPLATE_RESOLUTION_TIMEOUT_SECONDS =
+            SystemProperties.getLong(KubernetesLauncher.class.getName() + ".templateResolutionTimeoutSeconds", 60L);
 
     private volatile boolean launched = false;
 
@@ -120,7 +124,7 @@ public class KubernetesLauncher extends JNLPLauncher {
         String cloudName = node.getCloudName();
 
         try {
-            PodTemplate template = node.getTemplate();
+            PodTemplate template = waitForTemplate(node);
             KubernetesCloud cloud = node.getKubernetesCloud();
             KubernetesClient client = cloud.connect();
             Pod pod;
@@ -332,6 +336,29 @@ public class KubernetesLauncher extends JNLPLauncher {
             terminateOrLog(node);
             throw new RuntimeException(ex);
         }
+    }
+
+    /**
+     * Resolve the nodes {@link PodTemplate}, waiting briefly for it to become available.
+     * <p>After a controller restart, {@link org.csanchez.jenkins.plugins.kubernetes.pipeline.PodTemplateStepExecution#onResume}
+     * re-registers the dynamic template asynchronously, and this launcher may run first. Rather than failing
+     * immediately (which would leak the pod), poll for the template for a short while. Falls back to
+     * {@link KubernetesSlave#getTemplate()} (which throws a descriptive exception) if it never becomes available.
+     * See <a href="https://github.com/jenkinsci/kubernetes-plugin/issues/2512">...</a>.
+     */
+    @NonNull
+    private static PodTemplate waitForTemplate(KubernetesSlave node) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TEMPLATE_RESOLUTION_TIMEOUT_SECONDS);
+        PodTemplate template = node.getTemplateOrNull();
+        while (template == null && System.nanoTime() < deadline) {
+            LOGGER.log(
+                    FINE,
+                    () -> "Pod template " + node.getTemplateId() + " not yet available for " + node.getNodeName()
+                            + " waiting for it to be (re-)registered");
+            Thread.sleep(1000);
+            template = node.getTemplateOrNull();
+        }
+        return node.getTemplate();
     }
 
     private static void terminateOrLog(KubernetesSlave node) {
