@@ -324,7 +324,9 @@ class RestartPipelineTest {
         try (KubernetesClient client = new KubernetesClientBuilder().build()) {
             String nodeName =
                     client.nodes().list().getItems().get(0).getMetadata().getName();
-            client.nodes().withName(nodeName).edit(n -> edit.apply(new NodeBuilder(n)).build());
+            client.nodes()
+                    .withName(nodeName)
+                    .edit(n -> edit.apply(new NodeBuilder(n)).build());
         }
     }
 
@@ -334,15 +336,11 @@ class RestartPipelineTest {
                 .map(KubernetesSlave.class::cast)
                 .map(KubernetesSlave::getPodName)
                 .collect(Collectors.toSet());
-        await("no orphaned agent pods").atMost(60, TimeUnit.SECONDS).until(() -> cloud
-                .connect()
-                .pods()
-                .withLabel("jenkins", "slave")
-                .list()
-                .getItems()
-                .stream()
-                .map(p -> p.getMetadata().getName())
-                .allMatch(knownPodNames::contains));
+        await("no orphaned agent pods")
+                .atMost(60, TimeUnit.SECONDS)
+                .until(() -> cloud.connect().pods().withLabel("jenkins", "slave").list().getItems().stream()
+                        .map(p -> p.getMetadata().getName())
+                        .allMatch(knownPodNames::contains));
     }
 
     @Test
