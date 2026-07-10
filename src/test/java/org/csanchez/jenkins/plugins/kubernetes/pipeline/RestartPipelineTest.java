@@ -25,24 +25,36 @@
 package org.csanchez.jenkins.plugins.kubernetes.pipeline;
 
 import static java.util.Arrays.*;
+import static org.awaitility.Awaitility.await;
 import static org.csanchez.jenkins.plugins.kubernetes.KubernetesTestUtil.*;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import hudson.model.Computer;
 import hudson.model.Node;
 import hudson.model.Result;
+import hudson.model.TaskListener;
+import hudson.slaves.ComputerListener;
 import hudson.slaves.DumbSlave;
 import hudson.slaves.JNLPLauncher;
+import io.fabric8.kubernetes.api.model.NodeBuilder;
+import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.KubernetesClientBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import jenkins.model.Jenkins;
+import jenkins.util.Timer;
 import org.csanchez.jenkins.plugins.kubernetes.ContainerEnvVar;
 import org.csanchez.jenkins.plugins.kubernetes.ContainerTemplate;
 import org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud;
+import org.csanchez.jenkins.plugins.kubernetes.KubernetesComputer;
 import org.csanchez.jenkins.plugins.kubernetes.KubernetesSlave;
 import org.csanchez.jenkins.plugins.kubernetes.PodTemplate;
 import org.csanchez.jenkins.plugins.kubernetes.model.KeyValueEnvVar;
@@ -62,6 +74,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.jvnet.hudson.test.Issue;
 import org.jvnet.hudson.test.JenkinsRule;
 import org.jvnet.hudson.test.LogRecorder;
+import org.jvnet.hudson.test.TestExtension;
 import org.jvnet.hudson.test.junit.jupiter.BuildWatcherExtension;
 import org.jvnet.hudson.test.junit.jupiter.JenkinsSessionExtension;
 
@@ -262,6 +275,76 @@ class RestartPipelineTest {
         });
     }
 
+    /**
+     * Reproduces <a href="https://github.com/jenkinsci/kubernetes-plugin/issues/2512">...</a> if, on resume, the agent launcher runs before the dynamic pod template has been
+     * re-registered, the launcher must wait for the template rather than failing and leaking the pod. The race is
+     * forced deterministically by {@link TemplateRaceOnResume}, which drops the template right before the resumed
+     * launch and restores it shortly after. Without the fix the pod is orphaned and with it the build resumes on the
+     * same pod and the pod is cleaned up.
+     */
+    @Issue("JENKINS-67390")
+    @Test
+    void orphanedPodTemplateRaceOnResume() throws Throwable {
+        AtomicReference<String> projectName = new AtomicReference<>();
+        story.then(r -> {
+            configureAgentListener();
+            configureCloud();
+            // The pod is created but stays pending (nodeSelector disktype=special is unschedulable), so the
+            // agent never connects before the restart and launch() must run again on resume.
+            WorkflowRun b = getPipelineJobThenScheduleRun(r);
+            projectName.set(b.getParent().getFullName());
+            r.waitForMessage("Created Pod", b);
+            TemplateRaceOnResume.armed = true;
+        });
+        story.then(r -> {
+            WorkflowRun b = r.jenkins
+                    .getItemByFullName(projectName.get(), WorkflowJob.class)
+                    .getBuildByNumber(1);
+            // Make the node schedulable so the resumed agent can connect on the same pod.
+            addDiskTypeSpecialLabelToNode();
+            try {
+                assertNoOrphanedPods();
+                // And the build resumes to completion on that same pod.
+                r.assertLogContains("finished the test!", r.assertBuildStatusSuccess(r.waitForCompletion(b)));
+            } finally {
+                removeDiskTypeSpecialLabelFromNode();
+            }
+        });
+    }
+
+    private static void addDiskTypeSpecialLabelToNode() {
+        editFirstNode(n -> n.editMetadata().addToLabels("disktype", "special").endMetadata());
+    }
+
+    private static void removeDiskTypeSpecialLabelFromNode() {
+        editFirstNode(n -> n.editMetadata().removeFromLabels("disktype").endMetadata());
+    }
+
+    private static void editFirstNode(UnaryOperator<NodeBuilder> edit) {
+        try (KubernetesClient client = new KubernetesClientBuilder().build()) {
+            String nodeName =
+                    client.nodes().list().getItems().get(0).getMetadata().getName();
+            client.nodes().withName(nodeName).edit(n -> edit.apply(new NodeBuilder(n)).build());
+        }
+    }
+
+    private void assertNoOrphanedPods() throws Exception {
+        var knownPodNames = Jenkins.get().getNodes().stream()
+                .filter(KubernetesSlave.class::isInstance)
+                .map(KubernetesSlave.class::cast)
+                .map(KubernetesSlave::getPodName)
+                .collect(Collectors.toSet());
+        await("no orphaned agent pods").atMost(60, TimeUnit.SECONDS).until(() -> cloud
+                .connect()
+                .pods()
+                .withLabel("jenkins", "slave")
+                .list()
+                .getItems()
+                .stream()
+                .map(p -> p.getMetadata().getName())
+                .allMatch(knownPodNames::contains));
+    }
+
     @Test
     void taskListenerAfterRestart() throws Throwable {
         AtomicReference<String> projectName = new AtomicReference<>();
@@ -348,6 +431,37 @@ class RestartPipelineTest {
 
     private WorkflowRun getPipelineJobThenScheduleRun(JenkinsRule r) throws Exception {
         return createPipelineJobThenScheduleRun(r, getClass(), name);
+    }
+
+    /**
+     * Test hook that deterministically forces the JENKINS-67390 race: when armed, it removes the agent's dynamic
+     * pod template just before the (resumed) launch reads it, then restores it after a short delay. This makes
+     * {@code KubernetesLauncher.launch()} observe a missing template exactly as it would if it ran before
+     * {@code PodTemplateStepExecution#onResume} re-registered it.
+     */
+    @TestExtension("orphanedPodTemplateRaceOnResume")
+    public static class TemplateRaceOnResume extends ComputerListener {
+        static volatile boolean armed = false;
+
+        @Override
+        public void preLaunch(Computer c, TaskListener taskListener) {
+            if (!armed || !(c instanceof KubernetesComputer)) {
+                return;
+            }
+            armed = false; // only affect the first resumed launch
+            KubernetesSlave node = ((KubernetesComputer) c).getNode();
+            if (node == null) {
+                return;
+            }
+            KubernetesCloud cloud = node.getKubernetesCloud();
+            PodTemplate template = cloud.getTemplateById(node.getTemplateId());
+            if (template == null) {
+                return;
+            }
+            cloud.removeDynamicTemplate(template);
+            // Restore it shortly after, mimicking PodTemplateStepExecution#onResume re-registering it late.
+            Timer.get().schedule(() -> cloud.addDynamicTemplate(template), 5, TimeUnit.SECONDS);
+        }
     }
 
     private static File newFolder(File root, String... subDirs) throws Exception {
