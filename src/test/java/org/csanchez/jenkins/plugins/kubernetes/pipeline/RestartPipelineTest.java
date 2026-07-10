@@ -64,6 +64,7 @@ import org.jvnet.hudson.test.JenkinsRule;
 import org.jvnet.hudson.test.LogRecorder;
 import org.jvnet.hudson.test.junit.jupiter.BuildWatcherExtension;
 import org.jvnet.hudson.test.junit.jupiter.JenkinsSessionExtension;
+import org.jvnet.hudson.test.recipes.WithTimeout;
 
 class RestartPipelineTest {
 
@@ -216,8 +217,9 @@ class RestartPipelineTest {
     }
 
     @Test
+    @WithTimeout(value = 900) // in case we need to pull windows docker image
     void windowsRestart() throws Throwable {
-        assumeWindows(WINDOWS_1809_BUILD);
+        assumeWindows(WINDOWS_LTSC_2022_BUILD);
         AtomicReference<String> projectName = new AtomicReference<>();
         story.then(r -> {
             configureAgentListener();

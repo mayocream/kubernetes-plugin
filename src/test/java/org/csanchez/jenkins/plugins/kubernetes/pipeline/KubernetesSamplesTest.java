@@ -40,7 +40,7 @@ class KubernetesSamplesTest extends AbstractKubernetesPipelineTest {
         // TODO tried without success to use Parameterized here (need to construct parameters _after_ JenkinsRule
         // starts)
         for (GroovySample gs : ExtensionList.lookup(GroovySample.class)) {
-            if (gs.name().equals("kubernetes-windows") && !isWindows(null)) {
+            if (gs.name().equals("kubernetes-windows") && !isWindows(WINDOWS_LTSC_2022_BUILD)) {
                 System.err.println("==== Skipping " + gs.title() + " ====");
                 continue;
             }

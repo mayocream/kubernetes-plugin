@@ -28,7 +28,7 @@ import static jenkins.test.RunMatchers.logContains;
 import static org.awaitility.Awaitility.await;
 import static org.csanchez.jenkins.plugins.kubernetes.KubernetesTestUtil.CONTAINER_ENV_VAR_FROM_SECRET_VALUE;
 import static org.csanchez.jenkins.plugins.kubernetes.KubernetesTestUtil.POD_ENV_VAR_FROM_SECRET_VALUE;
-import static org.csanchez.jenkins.plugins.kubernetes.KubernetesTestUtil.WINDOWS_1809_BUILD;
+import static org.csanchez.jenkins.plugins.kubernetes.KubernetesTestUtil.WINDOWS_LTSC_2022_BUILD;
 import static org.csanchez.jenkins.plugins.kubernetes.KubernetesTestUtil.assumeWindows;
 import static org.csanchez.jenkins.plugins.kubernetes.KubernetesTestUtil.deletePods;
 import static org.csanchez.jenkins.plugins.kubernetes.KubernetesTestUtil.getLabels;
@@ -99,6 +99,7 @@ import org.jvnet.hudson.test.JenkinsRule;
 import org.jvnet.hudson.test.LogRecorder;
 import org.jvnet.hudson.test.MockAuthorizationStrategy;
 import org.jvnet.hudson.test.TestExtension;
+import org.jvnet.hudson.test.recipes.WithTimeout;
 
 class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
@@ -715,8 +716,9 @@ class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Issue("JENKINS-57256")
     @Test
+    @WithTimeout(value = 900) // in case we need to pull windows docker image
     void basicWindows() throws Exception {
-        assumeWindows(WINDOWS_1809_BUILD);
+        assumeWindows(WINDOWS_LTSC_2022_BUILD);
         cloud.setDirectConnection(false); // not yet supported by
         // https://github.com/jenkinsci/docker-inbound-agent/blob/517ccd68fd1ce420e7526ca6a40320c9a47a2c18/jenkins-agent.ps1
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
@@ -726,8 +728,9 @@ class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Issue("JENKINS-53500")
     @Test
+    @WithTimeout(value = 900) // in case we need to pull windows docker image
     void windowsContainer() throws Exception {
-        assumeWindows(WINDOWS_1809_BUILD);
+        assumeWindows(WINDOWS_LTSC_2022_BUILD);
         cloud.setDirectConnection(false);
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         r.assertLogContains("Directory of C:\\home\\jenkins\\agent\\workspace\\windows Container\\subdir", b);
@@ -739,7 +742,7 @@ class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
             "Does not appear fixable: https://github.com/jenkinsci/kubernetes-plugin/pull/1724#discussion_r2287512410")
     @Test
     void interruptedPodWindows() throws Exception {
-        assumeWindows(WINDOWS_1809_BUILD);
+        assumeWindows(WINDOWS_LTSC_2022_BUILD);
         cloud.setDirectConnection(false);
         r.waitForMessage("starting to sleep", b);
         b.getExecutor().interrupt();
@@ -749,20 +752,22 @@ class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
 
     @Test
     @Issue("JENKINS-75563")
+    @WithTimeout(value = 900) // in case we need to pull windows docker image
     // Before PR#1724 this would fail as windows processes were not killed
     // and hence files blocked. The test is a bit unrealistic as I want it
     // to be fast and deterministic, but imagine that instead of the ping we execute
     // a big checkout that locks some files and prevents next steps to execute
     void killsProcessesWindows() throws Exception {
-        assumeWindows(WINDOWS_1809_BUILD);
+        assumeWindows(WINDOWS_LTSC_2022_BUILD);
         cloud.setDirectConnection(false);
         r.assertBuildStatus(Result.ABORTED, r.waitForCompletion(b));
         r.assertLogContains("\"It worked!\"", b);
     }
 
     @Test
+    @WithTimeout(value = 900) // in case we need to pull windows docker image
     void secretMaskingWindows() throws Exception {
-        assumeWindows(WINDOWS_1809_BUILD);
+        assumeWindows(WINDOWS_LTSC_2022_BUILD);
         cloud.setDirectConnection(false);
         r.assertBuildStatusSuccess(r.waitForCompletion(b));
         r.assertLogContains(
