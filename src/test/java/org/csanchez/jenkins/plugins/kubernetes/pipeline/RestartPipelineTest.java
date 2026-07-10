@@ -337,9 +337,11 @@ class RestartPipelineTest {
                 .map(KubernetesSlave.class::cast)
                 .map(KubernetesSlave::getPodName)
                 .collect(Collectors.toSet());
+        // Scope to this test's pods only (labels include test/build/branch) so pods from other tests sharing the
+        // namespace are not mistaken for orphans.
         await("no orphaned agent pods")
                 .atMost(60, TimeUnit.SECONDS)
-                .until(() -> cloud.connect().pods().withLabel("jenkins", "slave").list().getItems().stream()
+                .until(() -> cloud.connect().pods().withLabels(getLabels(this, name)).list().getItems().stream()
                         .map(p -> p.getMetadata().getName())
                         .allMatch(knownPodNames::contains));
     }
