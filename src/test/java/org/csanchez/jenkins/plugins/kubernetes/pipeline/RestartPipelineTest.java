@@ -276,8 +276,9 @@ class RestartPipelineTest {
     }
 
     /**
-     * Reproduces <a href="https://github.com/jenkinsci/kubernetes-plugin/issues/2512">...</a> if, on resume, the agent launcher runs before the dynamic pod template has been
-     * re-registered, the launcher must wait for the template rather than failing and leaking the pod. The race is
+     * Reproduces <a href="https://github.com/jenkinsci/kubernetes-plugin/issues/2512">...</a> if, on resume,
+     * the agent launcher runs before the dynamic pod template has been re-registered,
+     * the launcher must wait for the template rather than failing and leaking the pod. The race is
      * forced deterministically by {@link TemplateRaceOnResume}, which drops the template right before the resumed
      * launch and restores it shortly after. Without the fix the pod is orphaned and with it the build resumes on the
      * same pod and the pod is cleaned up.
@@ -431,12 +432,6 @@ class RestartPipelineTest {
         return createPipelineJobThenScheduleRun(r, getClass(), name);
     }
 
-    /**
-     * Test hook that deterministically forces the JENKINS-67390 race: when armed, it removes the agent's dynamic
-     * pod template just before the (resumed) launch reads it, then restores it after a short delay. This makes
-     * {@code KubernetesLauncher.launch()} observe a missing template exactly as it would if it ran before
-     * {@code PodTemplateStepExecution#onResume} re-registered it.
-     */
     @TestExtension("orphanedPodTemplateRaceOnResume")
     public static class TemplateRaceOnResume extends ComputerListener {
         static volatile boolean armed = false;
