@@ -174,7 +174,7 @@ public class KubernetesCloud extends Cloud implements PodTemplateGroup {
     private GarbageCollection garbageCollection;
 
     /** @see ContainerListenDecorator */
-    private boolean activeContainers = true; // TODO do not enable by default
+    private boolean activeContainers;
 
     @NonNull
     private DescribableList<KubernetesCloudTrait, KubernetesCloudTraitDescriptor> traits =

@@ -19,7 +19,6 @@ package org.csanchez.jenkins.plugins.kubernetes.pipeline;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import com.cloudbees.jenkins.plugins.sshcredentials.impl.BasicSSHUserPrivateKey;
 import com.cloudbees.jenkins.plugins.sshcredentials.impl.BasicSSHUserPrivateKey.PrivateKeySource;
@@ -97,7 +96,6 @@ class ContainerExecDecoratorPipelineTest extends AbstractKubernetesPipelineTest 
     @Issue("JENKINS-58290")
     @Test
     void closedWebSocketExit() throws Exception {
-        assumeFalse(cloud.isActiveContainers());
         assertNotNull(createJobThenScheduleRun());
         containerExecLogs.capture(1000);
         r.waitForMessage("have started user process", b);

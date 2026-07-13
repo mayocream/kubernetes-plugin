@@ -72,7 +72,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
     @Override
     public Launcher decorate(Launcher launcher, Node node) {
         if (!launcher.isUnix()) {
-            LOGGER.info(() -> "TODO using original implementation on Windows " + node.getNodeName());
+            LOGGER.fine(() -> "using original implementation on Windows " + node.getNodeName());
             return fallback.decorate(launcher, node);
         }
         if (!(node instanceof KubernetesSlave ks)) {
@@ -109,7 +109,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                     x,
                     () -> "Could not verify eligibility of container " + container + " in " + ks.getPodName());
         }
-        LOGGER.info(() -> "TODO prepping launcher for " + container + " in " + ks.getPodName());
+        LOGGER.finer(() -> "prepping launcher for " + container + " in " + ks.getPodName());
         return new LauncherImpl(launcher, ks, pod);
     }
 
@@ -142,7 +142,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
         @Override
         public Proc launch(Launcher.ProcStarter starter) throws IOException {
             if (!isUnix()) {
-                throw new AbortException("TODO Windows not yet supported");
+                throw new AbortException("Windows not yet supported");
             }
             FilePath procDir;
             try {
@@ -157,7 +157,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                 if (!bootstrap.exists()) {
                     work.mkdirs();
                     bootstrap.copyFrom(ContainerListenDecorator.class.getResource("scripts/container-bootstrap.sh"));
-                    LOGGER.info("TODO created " + bootstrap);
+                    LOGGER.fine(() -> "created " + bootstrap);
                 }
                 procDir = work.child(container)
                         .child("%016x".formatted(RandomGenerator.getDefault().nextLong()));
@@ -186,7 +186,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                         .findFirst()
                         .orElse(null);
                 if (workspaceToContainer != null && !workspaceToContainer.equals(workspaceToAgent)) {
-                    LOGGER.info("TODO translating " + workspaceToAgent + " to " + workspaceToContainer);
+                    LOGGER.fine(() -> "translating " + workspaceToAgent + " to " + workspaceToContainer);
                     if (pwd.startsWith(workspaceToAgent + "/")) {
                         pwd = workspaceToContainer + pwd.substring(workspaceToAgent.length());
                     }
@@ -225,7 +225,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                     sb.append(" ");
                 }
                 f.write(sb.toString(), null);
-                LOGGER.info("TODO wrote to " + f + ": \n" + sb);
+                LOGGER.fine(() -> "wrote to " + f + ": \n" + sb);
                 if (!starter.quiet()) {
                     maskedPrintCommandLine(
                             cmds, starter.masks(), pwd != null ? new FilePath(pwdF.getChannel(), pwd) : null);
@@ -248,17 +248,20 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                 @Override
                 public int join() throws IOException, InterruptedException {
                     var status = procDir.child("status.txt");
-                    LOGGER.info("TODO waiting for " + status);
+                    LOGGER.fine(() -> "waiting for " + status);
                     while (!status.exists()) {
                         Thread.sleep(100);
                     }
+                    var r = Integer.parseInt(status.readToString().trim());
                     // No streaming supported, just logging/capturing of stdio from a completed process.
                     // In practice most steps are durable, which produce no stdio themselves;
                     // or relatively brief and so streaming is unnecessary.
-                    LOGGER.info("TODO " + procDir + " completed with status "
-                            + status.readToString().trim() + " and stdout "
-                            + procDir.child("out.txt").length() + "b stderr"
-                            + procDir.child("err.txt").length() + "b");
+                    if (LOGGER.isLoggable(Level.FINE)) {
+                        LOGGER.fine(procDir + " completed with status "
+                                + status.readToString().trim() + " and stdout "
+                                + procDir.child("out.txt").length() + "b stderr"
+                                + procDir.child("err.txt").length() + "b");
+                    }
                     var os = starter.stdout();
                     if (os == null) {
                         os = getListener().getLogger();
@@ -269,7 +272,6 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                         os = getListener().getLogger();
                     }
                     procDir.child("err.txt").copyTo(new CloseProofOutputStream(os));
-                    var r = Integer.parseInt(status.readToString().trim());
                     procDir.deleteRecursive();
                     return r;
                 }
@@ -340,7 +342,6 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
         @Override
         public Pod decorate(KubernetesCloud kubernetesCloud, Pod pod) {
             if (kubernetesCloud.isActiveContainers()) {
-                // TODO exclude Windows
                 for (var c : pod.getSpec().getContainers()) {
                     var cmds = c.getCommand();
                     if (cmds != null && !cmds.isEmpty() && cmds.get(0).matches("((/usr)?/bin/)?(sleep|cat)")) {

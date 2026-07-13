@@ -122,7 +122,7 @@ THE SOFTWARE.
     <f:optionalProperty field="garbageCollection" title="${%Enable garbage collection}"/>
 
     <f:entry title="${%Use active containers}" field="activeContainers">
-      <f:checkbox default="true"/> <!-- TODO do not enable by default -->
+      <f:checkbox/>
     </f:entry>
 
     <f:descriptorList field="traits" descriptors="${descriptor.allTraits}" />

@@ -42,7 +42,6 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.oneOf;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -322,7 +321,6 @@ class KubernetesPipelineTest extends AbstractKubernetesPipelineTest {
         // Completed /home/jenkins/agent/container-work/busybox/1bfd9327891af5c0 with status 127
         // The hack used to make this pass in ContainerExecDecorator is unsatisfactory;
         // the proper fix should be in BourneShellScript like https://github.com/jenkinsci/durable-task-plugin/pull/561
-        assumeFalse(cloud.isActiveContainers());
         r.assertBuildStatus(Result.FAILURE, r.waitForCompletion(b));
         r.assertLogContains("ERROR: Process exited immediately after creation", b);
         // r.assertLogContains("/bin/bash: no such file or directory", b); // Not printed in CI for an unknown reason.
