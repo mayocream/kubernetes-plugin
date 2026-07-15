@@ -188,7 +188,7 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                         .orElse(null);
                 if (workspaceToContainer != null && !workspaceToContainer.equals(workspaceToAgent)) {
                     LOGGER.fine(() -> "translating " + workspaceToAgent + " to " + workspaceToContainer);
-                    if (pwd.startsWith(workspaceToAgent + "/")) {
+                    if (pwd != null && pwd.startsWith(workspaceToAgent + "/")) {
                         pwd = workspaceToContainer + pwd.substring(workspaceToAgent.length());
                     }
                     // e.g., various paths created by BourneShellScript wrapper:

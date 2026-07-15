@@ -54,6 +54,12 @@ class ContainerListenDecoratorTest extends AbstractKubernetesPipelineTest {
                 "Hello, world!", r.assertBuildStatusSuccess(r.waitForCompletion(createJobThenScheduleRun())));
     }
 
+    @Test
+    void activeContainerCustomWorkingDir() throws Exception {
+        r.assertBuildStatusSuccess(r.waitForCompletion(createJobThenScheduleRun()));
+        r.assertLogContains("running in container in /elsewhere/workspace/", b);
+    }
+
     // TODO missing test coverage (compare https://github.com/jenkinsci/kubernetes-plugin/pull/2837/commits):
     // · using cat rather than sleep
     // · environment variables from agent pod vs. container
@@ -61,7 +67,6 @@ class ContainerListenDecoratorTest extends AbstractKubernetesPipelineTest {
     // · BASH_COMPLIANT_ENV_VAR (KubernetesPipelineTest#runWithEnvVariablesInContext)
     // · nonexistent container name (KubernetesDeclarativeAgentTest.declarativeWithNestedExplicitInheritance)
     // · unpatched container
-    // · custom workingDir
     // · restart controller during or between sh steps
     // · container step used in addition to defaultContainer (so nested steps)
     // · command masking (ContainerExecDecoratorPipelineTest.docker)
