@@ -19,6 +19,7 @@ package org.csanchez.jenkins.plugins.kubernetes.pipeline;
 import static org.csanchez.jenkins.plugins.kubernetes.KubernetesTestUtil.deletePods;
 import static org.csanchez.jenkins.plugins.kubernetes.KubernetesTestUtil.getLabels;
 
+import hudson.model.Result;
 import java.util.logging.Level;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,12 +39,20 @@ class ContainerListenDecoratorTest extends AbstractKubernetesPipelineTest {
                 "go version go1.6.3", r.assertBuildStatusSuccess(r.waitForCompletion(createJobThenScheduleRun())));
     }
 
+    @Test
+    void activeContainerInterruptedPod() throws Exception {
+        createJobThenScheduleRun();
+        r.waitForMessage("starting to sleep", b);
+        b.getExecutor().interrupt();
+        r.assertBuildStatus(Result.ABORTED, r.waitForCompletion(b));
+        r.assertLogContains("shut down gracefully", b);
+    }
+
     // TODO missing test coverage (compare https://github.com/jenkinsci/kubernetes-plugin/pull/2837/commits):
     // · using cat rather than sleep
     // · environment variables from agent pod vs. container
     //   (KubernetesDeclarativeAgentTest#declarative & ContainerExecDecoratorPipelineTest#containerEnvironmentIsHonored)
     // · BASH_COMPLIANT_ENV_VAR (KubernetesPipelineTest#runWithEnvVariablesInContext)
-    // · interrupting sh step (KubernetesPipelineTest#interruptedPod)
     // · nonexistent container name (KubernetesDeclarativeAgentTest.declarativeWithNestedExplicitInheritance)
     // · unpatched container
     // · custom workingDir
@@ -52,5 +61,7 @@ class ContainerListenDecoratorTest extends AbstractKubernetesPipelineTest {
     // · command masking (ContainerExecDecoratorPipelineTest.docker)
     // · nondefault shell (KubernetesPipelineTest#runInPodWithDifferentShell but a passing build)
     // · fallback on Windows
+    // · parallel sh steps
+    // · LAUNCH_DIAGNOSTICS support for interruption & parallelization (may need to make listen loop asynch)
 
 }
