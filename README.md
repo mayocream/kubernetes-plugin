@@ -942,6 +942,8 @@ spec:
     tty: true
 ```
 
+(Do not leave this system property on in a production controller, as it is untested and may have harmful effects.)
+
 ## Using WebSockets with a Jenkins controller with self-signed HTTPS certificate
 
 Using WebSockets is the easiest and recommended way to establish the connection between agents and a Jenkins controller running outside the cluster.
