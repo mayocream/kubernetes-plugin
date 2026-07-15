@@ -48,6 +48,12 @@ class ContainerListenDecoratorTest extends AbstractKubernetesPipelineTest {
         r.assertLogContains("shut down gracefully", b);
     }
 
+    @Test
+    void activeContainerPassiveSidecar() throws Exception {
+        r.assertLogContains(
+                "Hello, world!", r.assertBuildStatusSuccess(r.waitForCompletion(createJobThenScheduleRun())));
+    }
+
     // TODO missing test coverage (compare https://github.com/jenkinsci/kubernetes-plugin/pull/2837/commits):
     // · using cat rather than sleep
     // · environment variables from agent pod vs. container

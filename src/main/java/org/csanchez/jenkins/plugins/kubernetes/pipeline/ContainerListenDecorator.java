@@ -148,8 +148,9 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
             try {
                 var workspaceToAgent = workspaceVolumeMountPath(
                                 pod,
-                                c -> c.getEnv().stream()
-                                        .anyMatch(e -> e.getName().equals("JENKINS_AGENT_WORKDIR")))
+                                c -> c.getEnv() != null
+                                        && c.getEnv().stream()
+                                                .anyMatch(e -> e.getName().equals("JENKINS_AGENT_WORKDIR")))
                         .findFirst()
                         .orElseThrow(() -> new IOException("Cannot find JENKINS_AGENT_WORKDIR in " + ks.getPodName()));
                 var work = new FilePath(getChannel(), workspaceToAgent + "/container-work");
