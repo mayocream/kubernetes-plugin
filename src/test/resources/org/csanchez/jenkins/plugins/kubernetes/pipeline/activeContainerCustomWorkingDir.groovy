@@ -7,7 +7,7 @@ spec:
   containers:
   - name: shell
     image: ubuntu
-    workingDir: /elsewhere
+    workingDir: /else$where
     command:
     - sleep
     args:
@@ -18,7 +18,7 @@ spec:
     stages {
         stage('run') {
             steps {
-                sh 'echo running in container in $PWD'
+                sh 'echo running in container in "$PWD"'
             }
         }
     }

@@ -193,11 +193,11 @@ final class ContainerListenDecorator extends LauncherDecorator implements Serial
                     }
                     // e.g., various paths created by BourneShellScript wrapper:
                     cmds = cmds.stream()
-                            .map(s -> s.replaceAll(workspaceToAgent, workspaceToContainer))
+                            .map(s -> s.replace(workspaceToAgent, workspaceToContainer))
                             .toList();
                     // $WORKSPACE, $WORKSPACE_TMP
                     envVars = Stream.of(envVars)
-                            .map(s -> s.replaceAll(workspaceToAgent, workspaceToContainer))
+                            .map(s -> s.replace(workspaceToAgent, workspaceToContainer))
                             .toArray(String[]::new);
                 }
                 if (pwd != null) {

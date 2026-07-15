@@ -57,7 +57,7 @@ class ContainerListenDecoratorTest extends AbstractKubernetesPipelineTest {
     @Test
     void activeContainerCustomWorkingDir() throws Exception {
         r.assertBuildStatusSuccess(r.waitForCompletion(createJobThenScheduleRun()));
-        r.assertLogContains("running in container in /elsewhere/workspace/", b);
+        r.assertLogContains("running in container in /else$where/workspace/", b);
     }
 
     // TODO missing test coverage (compare https://github.com/jenkinsci/kubernetes-plugin/pull/2837/commits):
