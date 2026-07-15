@@ -41,7 +41,7 @@
 
   <properties>
     <changelist>999999-SNAPSHOT</changelist>
-    <jenkins.baseline>2.504</jenkins.baseline>
+    <jenkins.baseline>2.516</jenkins.baseline>
     <jenkins.version>${jenkins.baseline}.3</jenkins.version>
     <no-test-jar>false</no-test-jar>
     <useBeta>true</useBeta>
@@ -59,7 +59,7 @@
       <dependency>
         <groupId>io.jenkins.tools.bom</groupId>
         <artifactId>bom-${jenkins.baseline}.x</artifactId>
-        <version>5015.vb_52d36583443</version>
+        <version>6210.v69ea_fd8a_f010</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

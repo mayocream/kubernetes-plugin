@@ -816,6 +816,7 @@ Please read [Features controlled by system properties](https://www.jenkins.io/do
 * `io.jenkins.plugins.kubernetes.disableNoDelayProvisioning` (since 1.19.1) Whether to disable the no-delay provisioning strategy the plugin uses (defaults to `false`).
 * `io.jenkins.plugins.kubernetes.NoDelayProvisionerStrategy.disableCloudShuffle` Whether to disable the shuffling of clouds. When true clouds will be searched in order they are defined (defaults to `false`).
 * `jenkins.host.address` : (for unit tests) controls the host agents should use to contact Jenkins
+* `org.csanchez.jenkins.plugins.kubernetes.KubernetesLauncher.templateResolutionTimeout` : How long to wait for a dynamic pod template to be re-registered after a restart before giving up (defaults to `60sec`)
 * `org.csanchez.jenkins.plugins.kubernetes.PodTemplate.connectionTimeout` : The time in seconds to wait before considering the pod scheduling has failed (defaults to `1000`)
 * `org.csanchez.jenkins.plugins.kubernetes.pipeline.ContainerExecDecorator.stdinBufferSize` : stdin buffer size in bytes for commands sent to Kubernetes exec api. A low value will cause slowness in commands executed. A higher value will consume more memory (defaults to `16*1024`)
 * `org.csanchez.jenkins.plugins.kubernetes.pipeline.ContainerExecDecorator.websocketConnectionTimeout` : Time to wait for the websocket used by `container` step to connect (defaults to `30`)
