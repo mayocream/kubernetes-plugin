@@ -110,7 +110,7 @@ public class ContainerStepExecution extends StepExecution {
         }
 
         @Override
-        public void finished(StepContext context) {
+        protected void finished(StepContext context) {
             closeQuietly(context, closeables);
         }
     }

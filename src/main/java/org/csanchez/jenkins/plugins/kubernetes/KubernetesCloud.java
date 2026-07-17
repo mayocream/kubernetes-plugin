@@ -1452,7 +1452,7 @@ public class KubernetesCloud extends Cloud implements PodTemplateGroup {
     public static class PodTemplateSourceImpl extends PodTemplateSource {
         @NonNull
         @Override
-        public List<PodTemplate> getList(@NonNull KubernetesCloud cloud) {
+        protected List<PodTemplate> getList(@NonNull KubernetesCloud cloud) {
             return cloud.getTemplates();
         }
     }
