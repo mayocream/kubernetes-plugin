@@ -4,7 +4,7 @@
   <parent>
     <groupId>org.jenkins-ci.plugins</groupId>
     <artifactId>plugin</artifactId>
-    <version>6.2138.v03274d462c13</version>
+    <version>6.2211.v27f680c93c53</version>
     <relativePath />
   </parent>
 
@@ -41,7 +41,7 @@
 
   <properties>
     <changelist>999999-SNAPSHOT</changelist>
-    <jenkins.baseline>2.504</jenkins.baseline>
+    <jenkins.baseline>2.516</jenkins.baseline>
     <jenkins.version>${jenkins.baseline}.3</jenkins.version>
     <no-test-jar>false</no-test-jar>
     <useBeta>true</useBeta>
@@ -49,6 +49,9 @@
     <spotbugs.effort>Max</spotbugs.effort>
     <spotbugs.threshold>Low</spotbugs.threshold>
     <spotless.check.skip>false</spotless.check.skip>
+    <ban-junit4-imports.skip>false</ban-junit4-imports.skip>
+    <banObsoleteDependencyOverrides.skip>false</banObsoleteDependencyOverrides.skip>
+    <ban-commons-lang-2.skip>false</ban-commons-lang-2.skip>
   </properties>
 
   <dependencyManagement>
@@ -56,7 +59,7 @@
       <dependency>
         <groupId>io.jenkins.tools.bom</groupId>
         <artifactId>bom-${jenkins.baseline}.x</artifactId>
-        <version>5015.vb_52d36583443</version>
+        <version>6210.v69ea_fd8a_f010</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -259,13 +262,7 @@
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
-      <artifactId>mockito-core</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>pl.pragmatists</groupId>
-      <artifactId>JUnitParams</artifactId>
-      <version>1.1.1</version>
+      <artifactId>mockito-junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

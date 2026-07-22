@@ -7,7 +7,7 @@ kind: Pod
 spec:
   containers:
   - name: jnlp
-    image: "jenkins/inbound-agent:windowsservercore-1809"
+    image: "jenkins/inbound-agent:windowsservercore-ltsc2022"
     imagePullPolicy: IfNotPresent
     resources:
       cpu:
@@ -16,6 +16,7 @@ spec:
         request: 2Gi
   nodeSelector:
     kubernetes.io/os: windows
+    node.kubernetes.io/windows-build: 10.0.20348
 """
         }
     }

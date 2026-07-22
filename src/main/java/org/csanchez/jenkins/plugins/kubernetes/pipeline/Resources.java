@@ -86,7 +86,7 @@ public class Resources {
         }
 
         @Override
-        public void finished(StepContext context) {
+        protected void finished(StepContext context) {
             closeQuietly(context, closeables);
         }
     }
