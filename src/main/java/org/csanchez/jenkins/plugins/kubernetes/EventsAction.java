@@ -5,6 +5,8 @@ import hudson.model.Action;
 import hudson.model.Computer;
 import java.util.Collection;
 import java.util.List;
+
+import jenkins.model.Jenkins;
 import jenkins.model.TransientActionFactory;
 import org.jspecify.annotations.NonNull;
 
@@ -44,6 +46,9 @@ public class EventsAction implements Action {
 
         @Override
         public @NonNull Collection<? extends Action> createFor(@NonNull Computer target) {
+            if (!target.hasPermission(Jenkins.MANAGE)) {
+                return List.of();
+            }
             return List.of(new EventsAction(target));
         }
     }
