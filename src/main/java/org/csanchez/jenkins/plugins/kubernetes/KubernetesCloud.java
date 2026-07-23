@@ -1,7 +1,6 @@
 package org.csanchez.jenkins.plugins.kubernetes;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.commons.lang.StringUtils.isEmpty;
 import static org.csanchez.jenkins.plugins.kubernetes.PodTemplateUtils.sanitizeLabel;
 
 import com.cloudbees.plugins.credentials.CredentialsMatchers;
@@ -22,11 +21,13 @@ import hudson.model.DescriptorVisibilityFilter;
 import hudson.model.Item;
 import hudson.model.ItemGroup;
 import hudson.model.Label;
+import hudson.model.Saveable;
 import hudson.security.ACL;
 import hudson.security.AccessControlled;
 import hudson.security.Permission;
 import hudson.slaves.Cloud;
 import hudson.slaves.NodeProvisioner;
+import hudson.util.DescribableList;
 import hudson.util.FormApply;
 import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
@@ -59,6 +60,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -73,7 +75,6 @@ import jenkins.security.FIPS140;
 import jenkins.util.SystemProperties;
 import jenkins.websocket.WebSockets;
 import net.sf.json.JSONObject;
-import org.apache.commons.lang.StringUtils;
 import org.csanchez.jenkins.plugins.kubernetes.pipeline.PodTemplateMap;
 import org.csanchez.jenkins.plugins.kubernetes.pod.retention.Default;
 import org.csanchez.jenkins.plugins.kubernetes.pod.retention.PodRetention;
@@ -169,6 +170,13 @@ public class KubernetesCloud extends Cloud implements PodTemplateGroup {
 
     @CheckForNull
     private GarbageCollection garbageCollection;
+
+    /** @see ContainerListenDecorator */
+    private boolean activeContainers;
+
+    @NonNull
+    private DescribableList<KubernetesCloudTrait, KubernetesCloudTraitDescriptor> traits =
+            new DescribableList<>(Saveable.NOOP);
 
     /**
      * namespace -> informer
@@ -368,6 +376,43 @@ public class KubernetesCloud extends Cloud implements PodTemplateGroup {
     @DataBoundSetter
     public void setGarbageCollection(GarbageCollection garbageCollection) {
         this.garbageCollection = garbageCollection;
+    }
+
+    public boolean isActiveContainers() {
+        return activeContainers;
+    }
+
+    @DataBoundSetter
+    public void setActiveContainers(boolean activeContainers) {
+        this.activeContainers = activeContainers;
+    }
+    /**
+     * Get list of traits enabled for this cloud.
+     * @return configured traits, never null
+     */
+    @NonNull
+    public List<KubernetesCloudTrait> getTraits() {
+        return traits;
+    }
+
+    /**
+     * Replace the traits enabled for this cloud.
+     * @param traits configured traits, if {@code null} traits will be cleared.
+     */
+    @DataBoundSetter
+    public void setTraits(List<KubernetesCloudTrait> traits) {
+        this.traits = new DescribableList<>(Saveable.NOOP, Util.fixNull(traits));
+    }
+
+    /**
+     * Find configuration trait by type.
+     * @param traitType trait type class
+     * @return configuration trait or empty if not configured
+     * @param <T> trait type
+     */
+    @NonNull
+    public <T extends KubernetesCloudTrait> Optional<T> getTrait(Class<T> traitType) {
+        return Optional.ofNullable(this.traits.get(traitType));
     }
 
     /**
@@ -594,7 +639,15 @@ public class KubernetesCloud extends Cloud implements PodTemplateGroup {
         LOGGER.log(Level.FINEST, "Building connection to Kubernetes {0} URL {1} namespace {2}", new String[] {
             getDisplayName(), serverUrl, namespace
         });
-        KubernetesClient client = KubernetesClientProvider.createClient(this);
+        KubernetesClient client = null;
+        try {
+            client = KubernetesClientProvider.createClient(this);
+        } catch (KubernetesAuthException e) {
+            // it is possible the cached credentials are no longer valid (ex. when using k8s backed secrets)
+            // so we retry once more after invalidating the client
+            KubernetesClientProvider.invalidate(this.getDisplayName());
+            client = KubernetesClientProvider.createClient(this);
+        }
 
         LOGGER.log(Level.FINE, "Connected to Kubernetes {0} URL {1} namespace {2}", new String[] {
             getDisplayName(), client.getMasterUrl().toString(), namespace
@@ -711,7 +764,7 @@ public class KubernetesCloud extends Cloud implements PodTemplateGroup {
      * @param url Kubernetes server URL
      */
     private static void ensureKubernetesUrlInFipsMode(String url) {
-        if (!FIPS140.useCompliantAlgorithms() || StringUtils.isBlank(url)) {
+        if (!FIPS140.useCompliantAlgorithms() || url == null || url.isBlank()) {
             return;
         }
         if (!url.startsWith("https:")) {
@@ -746,7 +799,7 @@ public class KubernetesCloud extends Cloud implements PodTemplateGroup {
         if (!FIPS140.useCompliantAlgorithms()) {
             return;
         }
-        if (StringUtils.isBlank(serverCertificate)) {
+        if (serverCertificate == null || serverCertificate.isBlank()) {
             return; // JENKINS-73789, no certificate is accepted
         }
         try {
@@ -1013,7 +1066,7 @@ public class KubernetesCloud extends Cloud implements PodTemplateGroup {
 
             checkPermission(_context);
 
-            if (StringUtils.isBlank(name)) return FormValidation.error("name is required");
+            if (name == null || name.isBlank()) return FormValidation.error("name is required");
 
             try (KubernetesClient client = new KubernetesFactoryAdapter(
                             serverUrl,
@@ -1158,21 +1211,24 @@ public class KubernetesCloud extends Cloud implements PodTemplateGroup {
                 }
             }
 
+            boolean isJenkinsUrlConfigured = jenkinsUrl != null && !jenkinsUrl.isEmpty();
             if (value) {
                 if (webSocket) {
                     return FormValidation.error("Direct connection and WebSocket mode are mutually exclusive");
                 }
-                if (!isEmpty(jenkinsUrl))
+                if (isJenkinsUrlConfigured)
                     return FormValidation.warning("No need to configure Jenkins URL when direct connection is enabled");
 
                 if (Jenkins.get().getSlaveAgentPort() == 0)
                     return FormValidation.warning(
                             "A random 'TCP port for inbound agents' is configured in Global Security settings. In 'direct connection' mode agents will not be able to reconnect to a restarted controller with random port!");
             } else {
-                if (isEmpty(jenkinsUrl)) {
-                    String url = StringUtils.defaultIfBlank(
-                            System.getProperty("KUBERNETES_JENKINS_URL", System.getenv("KUBERNETES_JENKINS_URL")),
-                            JenkinsLocationConfiguration.get().getUrl());
+                if (!isJenkinsUrlConfigured) {
+                    String rawUrl =
+                            System.getProperty("KUBERNETES_JENKINS_URL", System.getenv("KUBERNETES_JENKINS_URL"));
+                    String url = (rawUrl != null && !rawUrl.isBlank())
+                            ? rawUrl
+                            : JenkinsLocationConfiguration.get().getUrl();
                     if (url != null) {
                         return FormValidation.ok("Will connect using " + url);
                     } else {
@@ -1219,7 +1275,7 @@ public class KubernetesCloud extends Cloud implements PodTemplateGroup {
         public FormValidation doCheckJenkinsUrl(@QueryParameter String value, @QueryParameter boolean directConnection)
                 throws IOException, ServletException {
             try {
-                if (!isEmpty(value)) new URL(value);
+                if (value != null && !value.isEmpty()) new URL(value);
             } catch (MalformedURLException e) {
                 return FormValidation.error(e, "Invalid Jenkins URL");
             }
@@ -1283,6 +1339,16 @@ public class KubernetesCloud extends Cloud implements PodTemplateGroup {
 
         public int getDefaultWaitForPod() {
             return DEFAULT_WAIT_FOR_POD_SEC;
+        }
+
+        @SuppressWarnings("unused") // used by jelly
+        public List<? extends KubernetesCloudTraitDescriptor> getAllTraits() {
+            return KubernetesCloudTrait.all();
+        }
+
+        @SuppressWarnings("unused") // used by jelly
+        public DescribableList<KubernetesCloudTrait, KubernetesCloudTraitDescriptor> getDefaultTraits() {
+            return new DescribableList<>(Saveable.NOOP, KubernetesCloudTrait.getDefaultTraits());
         }
     }
 
@@ -1398,7 +1464,7 @@ public class KubernetesCloud extends Cloud implements PodTemplateGroup {
     public static class PodTemplateSourceImpl extends PodTemplateSource {
         @NonNull
         @Override
-        public List<PodTemplate> getList(@NonNull KubernetesCloud cloud) {
+        protected List<PodTemplate> getList(@NonNull KubernetesCloud cloud) {
             return cloud.getTemplates();
         }
     }
@@ -1412,7 +1478,7 @@ public class KubernetesCloud extends Cloud implements PodTemplateGroup {
                     && jenkins.clouds.getAll(KubernetesCloud.class).isEmpty()) {
                 KubernetesCloud cloud = new KubernetesCloud("kubernetes");
                 cloud.setJenkinsUrl(
-                        "http://" + hostAddress + ":" + SystemProperties.getInteger("port", 8080) + "/jenkins/");
+                        "http://" + hostAddress + ":" + SystemProperties.getInteger("port", 8000) + "/jenkins/");
                 jenkins.clouds.add(cloud);
             }
         }

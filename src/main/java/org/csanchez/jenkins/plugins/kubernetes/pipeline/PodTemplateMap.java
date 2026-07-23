@@ -75,7 +75,7 @@ public class PodTemplateMap {
 
         @NonNull
         @Override
-        public List<PodTemplate> getList(@NonNull KubernetesCloud cloud) {
+        protected List<PodTemplate> getList(@NonNull KubernetesCloud cloud) {
             return PodTemplateMap.get().getTemplates(cloud);
         }
     }

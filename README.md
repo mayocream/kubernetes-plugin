@@ -78,14 +78,11 @@ adequate communication from Jenkins to the Kubernetes cluster, as seen below
 ![image](images/cloud-configuration.png)
 
 
-### Garbage collection (beta)
+### Garbage collection
 
 In some exceptional cases, agent pods can be left behind, with no declared Jenkins agent in the controller. They will try to reconnect over and over, until something deletes them.
 
-The plugin provides a garbage collection mechanism to clean up these pods. As it has been introduced recently,
-and generates extra load on the Kubernetes API server, it is disabled by default.
-
-Feel free to enable it and provide feedback about this functionality.
+The plugin provides a garbage collection mechanism to clean up these pods. As it may generate extra load on the Kubernetes API server, it is disabled by default.
 
 ![image](images/garbage-collection.png)
 
@@ -201,11 +198,13 @@ The container specified by `agentContainer` will be the one where shell steps (o
 
 To execute commands in another container part of the pod (different from the one running the Jenkins agent), you can use the `container` step.
 
-**Note**
----
-Due to implementation constraints, there can be issues when executing commands in different containers if they run using different uids.
-It is recommended to use the same uid across the different containers part of the same pod to avoid any issue.
----
+> [!NOTE]
+> Due to implementation constraints, there can be issues when executing commands in different containers if they run using different uids.
+> It is recommended to use the same uid across the different containers part of the same pod to avoid any issue.
+
+> [!NOTE]
+> The default implementation of the `container` step does not scale well.
+> Consider selecting the **Use active containers** option in cloud configuration for a more efficient mode.
 
 ```groovy
 podTemplate(
@@ -358,7 +357,7 @@ Either way it provides access to the following fields:
 * **annotations** Annotations to apply to the pod.
 * **inheritFrom** List of one or more pod templates to inherit from *(more details below)*.
 * **slaveConnectTimeout** Timeout in seconds for an agent to be online *(more details below)*.
-* **podRetention** Controls the behavior of keeping agent pods. Can be 'never()', 'onFailure()', 'always()', or 'default()' - if empty will default to deleting the pod after `activeDeadlineSeconds` has passed.
+* **podRetention** Controls the behavior of keeping agent pods. Can be 'never()', 'onFailure()', 'always()', 'evicted()', or 'default()' - if empty will default to deleting the pod after `activeDeadlineSeconds` has passed.
 * **activeDeadlineSeconds** If `podRetention` is set to `never()` or `onFailure()`, the pod is deleted after this deadline is passed.
 * **idleMinutes** Allows the pod to remain active for reuse until the configured number of minutes has passed since the last step was executed on it.
 * **showRawYaml** Enable or disable the output of the raw pod manifest. Defaults to `true`
@@ -817,6 +816,7 @@ Please read [Features controlled by system properties](https://www.jenkins.io/do
 * `io.jenkins.plugins.kubernetes.disableNoDelayProvisioning` (since 1.19.1) Whether to disable the no-delay provisioning strategy the plugin uses (defaults to `false`).
 * `io.jenkins.plugins.kubernetes.NoDelayProvisionerStrategy.disableCloudShuffle` Whether to disable the shuffling of clouds. When true clouds will be searched in order they are defined (defaults to `false`).
 * `jenkins.host.address` : (for unit tests) controls the host agents should use to contact Jenkins
+* `org.csanchez.jenkins.plugins.kubernetes.KubernetesLauncher.templateResolutionTimeout` : How long to wait for a dynamic pod template to be re-registered after a restart before giving up (defaults to `60sec`)
 * `org.csanchez.jenkins.plugins.kubernetes.PodTemplate.connectionTimeout` : The time in seconds to wait before considering the pod scheduling has failed (defaults to `1000`)
 * `org.csanchez.jenkins.plugins.kubernetes.pipeline.ContainerExecDecorator.stdinBufferSize` : stdin buffer size in bytes for commands sent to Kubernetes exec api. A low value will cause slowness in commands executed. A higher value will consume more memory (defaults to `16*1024`)
 * `org.csanchez.jenkins.plugins.kubernetes.pipeline.ContainerExecDecorator.websocketConnectionTimeout` : Time to wait for the websocket used by `container` step to connect (defaults to `30`)
@@ -942,6 +942,8 @@ spec:
     tty: true
 ```
 
+(Do not leave this system property on in a production controller, as it is untested and may have harmful effects.)
+
 ## Using WebSockets with a Jenkins controller with self-signed HTTPS certificate
 
 Using WebSockets is the easiest and recommended way to establish the connection between agents and a Jenkins controller running outside the cluster.
@@ -1018,7 +1020,7 @@ then
 ```bash
 kubectl krew install tunnel # as needed; install Krew first
 kubectl tunnel expose jenkins 8000:8000 8001:8001 &
-mvn test -Djenkins.host.address=jenkins.default -Dport=8000 -DslaveAgentPort=8001 -Dtest=KubernetesPipelineTest#runInPod
+mvn test -Pktunnel -Dtest=KubernetesPipelineTest#runInPod
 ```
 
 Alternately, you can run everything like in CI:
@@ -1031,7 +1033,7 @@ export KIND_PRELOAD=true # optionally
 You can also run interactively after setting up the tunnel:
 
 ```bash
-mvn hpi:run -Djenkins.host.address=jenkins.default -Dport=8000 -Djenkins.model.Jenkins.slaveAgentPort=8001
+mvn hpi:run -Pktunnel
 ```
 
 # Docker image

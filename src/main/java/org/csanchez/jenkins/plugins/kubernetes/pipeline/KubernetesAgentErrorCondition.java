@@ -115,9 +115,10 @@ public class KubernetesAgentErrorCondition extends ErrorCondition {
                 } else {
                     // May have been removed already, but we can look up the labels to see what it was.
                     Set<LabelAtom> labels = ws.getLabels();
-                    if (labels.stream().noneMatch(l -> Jenkins.get().clouds.stream()
-                            .anyMatch(c ->
-                                    c instanceof KubernetesCloud && ((KubernetesCloud) c).getTemplate(l) != null))) {
+                    if (labels.stream()
+                            .noneMatch(l -> Jenkins.get().clouds.stream()
+                                    .anyMatch(c -> c instanceof KubernetesCloud
+                                            && ((KubernetesCloud) c).getTemplate(l) != null))) {
                         if (!handleNonKubernetes) {
                             listener.getLogger()
                                     .println(node + " did not look like a Kubernetes agent judging by " + labels

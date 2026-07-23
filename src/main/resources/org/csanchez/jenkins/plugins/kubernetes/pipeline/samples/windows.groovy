@@ -8,9 +8,9 @@ kind: Pod
 spec:
   containers:
   - name: jnlp
-    image: jenkins/inbound-agent:windowsservercore-1809
+    image: jenkins/inbound-agent:windowsservercore-ltsc2022
   - name: shell
-    image: mcr.microsoft.com/powershell:preview-windowsservercore-1809
+    image: mcr.microsoft.com/powershell:preview-windowsservercore-ltsc2022
     command:
     - powershell
     args:
@@ -18,6 +18,7 @@ spec:
     - 999999
   nodeSelector:
     kubernetes.io/os: windows
+    node.kubernetes.io/windows-build: 10.0.20348
 ''') {
     retry(count: 2, conditions: [kubernetesAgent(), nonresumable()]) {
         node(POD_LABEL) {

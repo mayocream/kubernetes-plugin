@@ -22,37 +22,29 @@ import hudson.ExtensionList;
 import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition;
 import org.jenkinsci.plugins.workflow.cps.GroovySample;
 import org.jenkinsci.plugins.workflow.job.WorkflowJob;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ErrorCollector;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
-public class KubernetesSamplesTest extends AbstractKubernetesPipelineTest {
+class KubernetesSamplesTest extends AbstractKubernetesPipelineTest {
 
-    // TODO tried without success to use Parameterized here (need to construct parameters _after_ JenkinsRule starts)
-    @Rule
-    public ErrorCollector errors = new ErrorCollector();
-
-    {
-        r.timeout *= 2; // again, without Parameterized we are running a bunch of builds in one test case
-    }
-
-    @Before
-    public void setUp() throws Exception {
+    @BeforeEach
+    void beforeEach() throws Exception {
         deletePods(cloud.connect(), getLabels(cloud, this, name), false);
     }
 
     @Test
-    public void smokes() throws Exception {
+    void smokes() throws Exception {
+        // TODO tried without success to use Parameterized here (need to construct parameters _after_ JenkinsRule
+        // starts)
         for (GroovySample gs : ExtensionList.lookup(GroovySample.class)) {
-            if (gs.name().equals("kubernetes-windows") && !isWindows(null)) {
+            if (gs.name().equals("kubernetes-windows") && !isWindows(WINDOWS_LTSC_2022_BUILD)) {
                 System.err.println("==== Skipping " + gs.title() + " ====");
                 continue;
             }
             System.err.println("==== " + gs.title() + " ====");
             p = r.createProject(WorkflowJob.class, gs.name());
             p.setDefinition(new CpsFlowDefinition(gs.script(), true));
-            errors.checkSucceeds(() -> r.buildAndAssertSuccess(p));
+            r.buildAndAssertSuccess(p);
         }
     }
 }

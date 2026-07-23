@@ -26,12 +26,10 @@ package org.csanchez.jenkins.plugins.kubernetes;
 import static java.util.logging.Level.FINE;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.WARNING;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeNoException;
-import static org.junit.Assume.assumeTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-import edu.umd.cs.findbugs.annotations.CheckForNull;
 import hudson.Util;
 import io.fabric8.kubernetes.api.model.NamespaceBuilder;
 import io.fabric8.kubernetes.api.model.Node;
@@ -42,7 +40,6 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.utils.Serialization;
-import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URL;
 import java.util.Collections;
@@ -59,12 +56,9 @@ import java.util.stream.IntStream;
 import jenkins.model.Jenkins;
 import jenkins.model.JenkinsLocationConfiguration;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
-import org.jenkinsci.plugins.kubernetes.auth.KubernetesAuthException;
 import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition;
 import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 import org.jenkinsci.plugins.workflow.job.WorkflowRun;
-import org.junit.rules.TestName;
 import org.jvnet.hudson.test.JenkinsRule;
 
 public class KubernetesTestUtil {
@@ -81,9 +75,9 @@ public class KubernetesTestUtil {
     public static final String CONTAINER_ENV_VAR_FROM_SECRET_VALUE = "container-pa55w0rd";
     public static final String POD_ENV_VAR_FROM_SECRET_VALUE = "pod-pa55w0rd";
 
-    public static final String WINDOWS_1809_BUILD = "10.0.17763";
+    public static final String WINDOWS_LTSC_2022_BUILD = "10.0.20348";
 
-    public static KubernetesCloud setupCloud(Object test, TestName name) throws KubernetesAuthException, IOException {
+    public static KubernetesCloud setupCloud(Object test, String name) throws Exception {
         KubernetesCloud cloud = new KubernetesCloud("kubernetes");
         // unique labels per test
         cloud.setPodLabels(PodLabel.fromMap(getLabels(cloud, test, name)));
@@ -93,7 +87,7 @@ public class KubernetesTestUtil {
 
         // if there is a namespace specific for this branch (ie. kubernetes-plugin-test-master), use it
         String branch = System.getenv("BRANCH_NAME");
-        if (StringUtils.isNotBlank(branch)) {
+        if (branch != null && !branch.isBlank()) {
             String namespaceWithBranch = String.format("%s-%s", DEFAULT_TESTING_NAMESPACE, branch);
             LOGGER.log(FINE, "Trying to use namespace: {0}", testingNamespace);
             try {
@@ -127,7 +121,7 @@ public class KubernetesTestUtil {
         // Agents running in Kubernetes (minikube) need to connect to this server, so localhost does not work
         URL url = new URL(JenkinsLocationConfiguration.get().getUrl());
         String hostAddress = System.getProperty("jenkins.host.address");
-        if (org.apache.commons.lang3.StringUtils.isBlank(hostAddress)) {
+        if (hostAddress == null || hostAddress.isBlank()) {
             hostAddress = InetAddress.getLocalHost().getHostAddress();
         }
         System.err.println("Calling home to address: " + hostAddress);
@@ -141,11 +135,11 @@ public class KubernetesTestUtil {
         }
     }
 
-    public static void assumeKubernetes() throws Exception {
+    public static void assumeKubernetes() {
         try (KubernetesClient client = new KubernetesClientBuilder().build()) {
             client.pods().list();
         } catch (Exception e) {
-            assumeNoException(e);
+            assumeTrue(false, e.toString());
         }
     }
 
@@ -156,10 +150,10 @@ public class KubernetesTestUtil {
      * Note that running the <em>controller</em> on Windows is untested.
      */
     public static void assumeWindows(String buildNumber) {
-        assumeTrue("Cluster seems to contain no Windows nodes with build " + buildNumber, isWindows(buildNumber));
+        assumeTrue(isWindows(buildNumber), "Cluster seems to contain no Windows nodes with build " + buildNumber);
     }
 
-    public static boolean isWindows(@CheckForNull String buildNumber) {
+    public static boolean isWindows(String buildNumber) {
         try (KubernetesClient client = new KubernetesClientBuilder().build()) {
             for (Node n : client.nodes().list().getItems()) {
                 Map<String, String> labels = n.getMetadata().getLabels();
@@ -167,24 +161,22 @@ public class KubernetesTestUtil {
                 String windowsBuild = labels.get("node.kubernetes.io/windows-build");
                 LOGGER.info(() -> "Found node " + n.getMetadata().getName() + " running OS " + os
                         + " with Windows build " + windowsBuild);
-                if ("windows".equals(os)) {
-                    if (buildNumber == null || buildNumber.equals(windowsBuild)) {
-                        return true;
-                    }
+                if ("windows".equals(os) && buildNumber.equals(windowsBuild)) {
+                    return true;
                 }
             }
         }
         return false;
     }
 
-    public static Map<String, String> getLabels(Object o, TestName name) {
+    public static Map<String, String> getLabels(Object o, String name) {
         return getLabels(null, o, name);
     }
 
     /**
      * Labels to add to the pods so we can match them to a specific build run, test class and method
      */
-    public static Map<String, String> getLabels(KubernetesCloud cloud, Object o, TestName name) {
+    public static Map<String, String> getLabels(KubernetesCloud cloud, Object o, String name) {
         Map<String, String> l = new HashMap<>();
         l.put("BRANCH_NAME", BRANCH_NAME == null ? "undefined" : BRANCH_NAME);
         l.put("BUILD_NUMBER", BUILD_NUMBER == null ? "undefined" : BUILD_NUMBER);
@@ -192,7 +184,7 @@ public class KubernetesTestUtil {
             l.putAll(cloud.getPodLabelsMap());
         }
         l.put("class", o.getClass().getSimpleName());
-        l.put("test", name.getMethodName());
+        l.put("test", name);
         return l;
     }
 
@@ -245,7 +237,7 @@ public class KubernetesTestUtil {
             PodList list = client.pods().withLabels(labels).list();
             if (!list.getItems().isEmpty()) {
                 LOGGER.log(WARNING, "Deleting leftover pods: {0}", print(list));
-                return client.pods().withLabels(labels).delete().size() > 0;
+                return !client.pods().withLabels(labels).delete().isEmpty();
             }
         }
         return false;
@@ -320,6 +312,6 @@ public class KubernetesTestUtil {
 
     public static void assertRegex(String name, String regex) {
         assertNotNull(name);
-        assertTrue(String.format("Name does not match regex [%s]: '%s'", regex, name), name.matches(regex));
+        assertTrue(name.matches(regex), String.format("Name does not match regex [%s]: '%s'", regex, name));
     }
 }
