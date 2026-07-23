@@ -5,7 +5,6 @@ import hudson.model.Action;
 import hudson.model.Computer;
 import java.util.Collection;
 import java.util.List;
-
 import jenkins.model.Jenkins;
 import jenkins.model.TransientActionFactory;
 import org.jspecify.annotations.NonNull;
