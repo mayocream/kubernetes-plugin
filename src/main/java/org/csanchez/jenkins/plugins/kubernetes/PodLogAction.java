@@ -46,7 +46,7 @@ public class PodLogAction implements Action {
 
         @Override
         public @NonNull Collection<? extends Action> createFor(@NonNull Computer target) {
-            if (!target.hasPermission(Jenkins.MANAGE)) {
+            if (!Jenkins.get().hasPermission(Jenkins.MANAGE)) {
                 return List.of();
             }
             return List.of(new PodLogAction(target));
